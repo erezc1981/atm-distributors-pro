@@ -1,182 +1,648 @@
-<style>
-  .terminal-card {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 12px 16px;
-    margin-bottom: 10px;
-    border-radius: 10px;
-    background: #fff5f5;
-    border: 1px solid #f2d6d6;
-    direction: rtl;
-  }
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ATM Pro — ניהול קו כספומטים למפיצים</title>
+  <link rel="manifest" href="manifest.json" />
+  <style>
+    :root {
+      --bg: #f4f6f9;
+      --card: #ffffff;
+      --alert-bg: #fff5f5;
+      --alert-border: #f2d6d6;
+      --text: #111827;
+      --muted: #6b7280;
+      --primary: #1d4ed8;
+      --primary-soft: #eff6ff;
+      --success: #15803d;
+      --border: #e5e7eb;
+    }
 
-  .terminal-header {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
+    * { box-sizing: border-box; }
 
-  .terminal-title {
-    font-weight: 700;
-    font-size: 1rem;
-  }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      direction: rtl;
+    }
 
-  .terminal-id {
-    font-weight: 400;
-    color: #555;
-  }
+    .topbar {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
 
-  .terminal-meta {
-    font-size: 0.9rem;
-    color: #444;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px;
-  }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      font-size: 1.1rem;
+    }
 
-  .target-inline {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-  }
+    .badge-pro {
+      background: var(--primary);
+      color: #fff;
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
 
-  .icon-edit-btn {
-    background: transparent;
-    border: none;
-    padding: 2px 5px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    line-height: 1;
-    border-radius: 6px;
-  }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
 
-  .icon-edit-btn:hover {
-    background: rgba(0, 0, 0, 0.08);
-  }
+    .container {
+      max-width: 1050px;
+      margin: 20px auto;
+      padding: 0 16px 40px;
+    }
 
-  .terminal-controls {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
 
-  .cassette-box {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-width: 115px;
-    padding: 4px 10px;
-    border-radius: 8px;
-    background: #ffffff;
-    border: 1px solid #ddd;
-  }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
 
-  .cassette-label {
-    font-size: 0.75rem;
-    color: #666;
-  }
+    .stat-box {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+    }
 
-  .cassette-amount {
-    font-weight: 700;
-    font-size: 1.05rem;
-    color: #111;
-  }
+    .stat-label { font-size: 0.82rem; color: var(--muted); }
+    .stat-value { font-size: 1.35rem; font-weight: 800; margin-top: 4px; }
 
-  .btn-fill {
-    padding: 6px 12px;
-    border-radius: 8px;
-    border: 1px solid #1d4ed8;
-    background: #eff6ff;
-    color: #1d4ed8;
-    font-weight: 600;
-    cursor: pointer;
-  }
+    .terminal-card {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 16px;
+      margin-bottom: 10px;
+      border-radius: 10px;
+      background: var(--alert-bg);
+      border: 1px solid var(--alert-border);
+    }
 
-  .btn-secondary {
-    padding: 6px 12px;
-    border-radius: 8px;
-    border: 1px solid #ccc;
-    background: #fff;
-    cursor: pointer;
-  }
+    .terminal-card.ok {
+      background: var(--card);
+      border-color: var(--border);
+    }
 
-  .btn-remove {
-    padding: 6px 10px;
-    border-radius: 8px;
-    border: 1px solid #ddd;
-    background: #fff;
-    cursor: pointer;
-  }
-</style>
+    .terminal-header {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
 
-<script>
-  function formatAmountILS(val) {
-    const num = Number(val ?? 0);
-    return Number.isFinite(num) ? num.toLocaleString("he-IL") : "0";
-  }
+    .terminal-title {
+      font-weight: 700;
+      font-size: 1rem;
+    }
 
-  function renderTerminalCard(t) {
-    const id = String(t.id ?? "");
-    const name = String(t.name ?? `מסוף ${id}`);
-    const threshold = formatAmountILS(t.threshold ?? 3000);
-    const targetK = Number(t.baseTargetK ?? 15);
-    const balanceFormatted = formatAmountILS(t.balance ?? 0);
+    .terminal-id {
+      font-weight: 500;
+      color: var(--muted);
+    }
 
-    return `
-      <div class="terminal-card" data-terminal-id="${id}">
-        <div class="terminal-header">
-          <div class="terminal-title">${name} <span class="terminal-id">(${id})</span></div>
-          <div class="terminal-meta">
-            <span>סף התראה: ₪${threshold}</span>
-            <span>•</span>
-            <span class="target-inline">
-              <span>יעד מילוי: <strong id="target-val-${id}">${targetK}k</strong></span>
-              <button
-                type="button"
-                class="icon-edit-btn"
-                title="ערוך יעד מילוי"
-                aria-label="ערוך יעד מילוי"
-                onclick="openEditTargetModal('${id}')"
-              >✏️</button>
-            </span>
-          </div>
-        </div>
+    .terminal-meta {
+      font-size: 0.9rem;
+      color: #374151;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
 
-        <div class="terminal-controls">
-          <div class="cassette-box">
-            <span class="cassette-label">במחסנית (₪)</span>
-            <span class="cassette-amount" id="cassette-val-${id}">${balanceFormatted}</span>
-          </div>
+    .target-inline {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
 
-          <button
-            type="button"
-            class="btn-fill"
-            onclick="quickFillTerminal('${id}')"
-          >למלא ${targetK}k</button>
+    .icon-edit-btn {
+      background: transparent;
+      border: none;
+      padding: 2px 5px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      line-height: 1;
+      border-radius: 6px;
+    }
 
-          <button
-            type="button"
-            class="btn-secondary"
-            onclick="markRefilled('${id}')"
-          >סמן הטענה</button>
+    .icon-edit-btn:hover {
+      background: rgba(0, 0, 0, 0.08);
+    }
 
-          <button
-            type="button"
-            class="btn-remove"
-            title="הסר מסוף"
-            onclick="removeTerminal('${id}')"
-          >✕</button>
-        </div>
+    .terminal-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .cassette-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 115px;
+      padding: 5px 12px;
+      border-radius: 8px;
+      background: #ffffff;
+      border: 1px solid #d1d5db;
+      user-select: all;
+    }
+
+    .cassette-label {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .cassette-amount {
+      font-weight: 800;
+      font-size: 1.05rem;
+      color: var(--text);
+    }
+
+    button {
+      font-family: inherit;
+      cursor: pointer;
+      border-radius: 8px;
+      padding: 7px 12px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+
+    .btn-fill {
+      background: var(--primary-soft);
+      border-color: #93c5fd;
+      color: var(--primary);
+    }
+
+    .btn-whatsapp {
+      background: #16a34a;
+      border-color: #16a34a;
+      color: #fff;
+    }
+
+    .auth-box {
+      max-width: 420px;
+      margin: 50px auto;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    input {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.95rem;
+    }
+
+    .days-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 10px 0;
+    }
+
+    .day-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: #f9fafb;
+      border: 1px solid var(--border);
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+    }
+
+    .hidden { display: none !important; }
+    .status-note { font-size: 0.88rem; color: var(--muted); }
+  </style>
+
+  <!-- Firebase Compat SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+</head>
+<body>
+  <!-- מסך התחברות / הרשמה -->
+  <div id="authSection" class="auth-box">
+    <div class="brand">
+      <span>ATM Pro</span>
+      <span class="badge-pro">מפיצים</span>
+    </div>
+    <p class="status-note" style="margin:0">התחבר לחשבון המפיץ או הירשם ל-14 ימי ניסיון.</p>
+    <input id="emailInput" type="email" placeholder="אימייל" autocomplete="email" />
+    <input id="passwordInput" type="password" placeholder="סיסמה (לפחות 6 תווים)" autocomplete="current-password" />
+    <button id="loginBtn" type="button" class="btn-primary">התחברות</button>
+    <button id="registerBtn" type="button">הרשמה + 14 יום חינם</button>
+    <div id="authError" style="color:#b91c1c;font-size:0.88rem;"></div>
+  </div>
+
+  <!-- מסך ניהול ראשי -->
+  <div id="appSection" class="hidden">
+    <header class="topbar">
+      <div class="brand">
+        <span>ATM Pro — מפיצים</span>
+        <span id="userEmailBadge" class="status-note"></span>
       </div>
-    `;
-  }
+      <div class="toolbar">
+        <button id="toggleRouteBtn" type="button">📅 ימי קו</button>
+        <button id="toggleCasBtn" type="button">🏦 כספונט</button>
+        <button id="whatsappBtn" type="button" class="btn-whatsapp">💬 וואטסאפ</button>
+        <button id="logoutBtn" type="button">יציאה</button>
+      </div>
+    </header>
 
-  function renderTerminalsList(containerEl, terminals) {
-    if (!containerEl) return;
-    containerEl.innerHTML = (terminals || []).map(renderTerminalCard).join("");
-  }
-</script>
+    <main class="container">
+      <!-- הגדרת ימי קו -->
+      <section id="routePanel" class="panel hidden">
+        <strong>הגדרת ימי קו</strong>
+        <div id="daysContainer" class="days-row"></div>
+        <button id="saveRouteBtn" type="button" class="btn-primary">שמור ימי קו</button>
+        <span id="routeSavedMsg" class="status-note"></span>
+      </section>
+
+      <!-- הגדרות וסנכרון כספונט -->
+      <section id="casPanel" class="panel hidden">
+        <strong>חיבור וסנכרון CASMobile (casmobile.co.il)</strong>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:10px 0;">
+          <input id="casUserInput" type="text" placeholder="שם משתמש בכספונט" />
+          <input id="casPassInput" type="password" placeholder="סיסמה בכספונט" />
+        </div>
+        <button id="saveAndSyncCasBtn" type="button" class="btn-primary">שמור ובקש סנכרון</button>
+        <div id="casSyncStatus" class="status-note" style="margin-top:8px;"></div>
+      </section>
+
+      <!-- סיכום נתונים -->
+      <section class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-label">מסופים במעקב</div>
+          <div id="statCount" class="stat-value">0</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">התראות יתרה נמוכה</div>
+          <div id="statAlerts" class="stat-value">0</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">סה״כ יתרה במחסניות</div>
+          <div id="statBalance" class="stat-value">₪0</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">סה״כ יחידות 5,000 ₪ למילוי</div>
+          <div id="statPacks5k" class="stat-value">0</div>
+        </div>
+      </section>
+
+      <!-- רשימת מסופים -->
+      <section id="terminalsList"></section>
+    </main>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyD-PLACEHOLDER",
+      authDomain: "atm-distributors-pro.firebaseapp.com",
+      projectId: "atm-distributors-pro",
+      storageBucket: "atm-distributors-pro.appspot.com",
+      messagingSenderId: "000000000000",
+      appId: "1:000000000000:web:000000000000"
+    };
+
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    const DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+    let currentUser = null;
+    let currentTerminals = [];
+    let unsubscribeTerminals = null;
+    let unsubscribeCas = null;
+
+    function formatAmountILS(val) {
+      const num = Number(val ?? 0);
+      return Number.isFinite(num) ? num.toLocaleString("he-IL") : "0";
+    }
+
+    function calcPacks5k(balance, targetK) {
+      const targetAmount = Number(targetK ?? 15) * 1000;
+      const currentBal = Number(balance ?? 0);
+      const diff = Math.max(0, targetAmount - currentBal);
+      return Math.round(diff / 5000);
+    }
+
+    function renderTerminalCard(t) {
+      const id = String(t.id ?? "");
+      const name = String(t.name ?? `מסוף ${id}`);
+      const thresholdNum = Number(t.threshold ?? 3000);
+      const threshold = formatAmountILS(thresholdNum);
+      const targetK = Number(t.baseTargetK ?? 15);
+      const rawBalance = Number(t.balance ?? 0);
+      const balanceFormatted = formatAmountILS(rawBalance);
+      const isAlert = rawBalance <= thresholdNum;
+
+      return `
+        <div class="terminal-card ${isAlert ? "" : "ok"}" data-terminal-id="${id}">
+          <div class="terminal-header">
+            <div class="terminal-title">${name} <span class="terminal-id">(${id})</span></div>
+            <div class="terminal-meta">
+              <span>סף התראה: ₪${threshold}</span>
+              <span>•</span>
+              <span class="target-inline">
+                <span>יעד מילוי: <strong id="target-val-${id}">${targetK}k</strong></span>
+                <button
+                  type="button"
+                  class="icon-edit-btn"
+                  title="ערוך יעד מילוי"
+                  aria-label="ערוך יעד מילוי"
+                  onclick="openEditTargetModal('${id}')"
+                >✏️</button>
+              </span>
+            </div>
+          </div>
+
+          <div class="terminal-controls">
+            <div class="cassette-box">
+              <span class="cassette-label">במחסנית (₪)</span>
+              <span class="cassette-amount" id="cassette-val-${id}">${balanceFormatted}</span>
+            </div>
+
+            <button
+              type="button"
+              class="btn-fill"
+              onclick="quickFillTerminal('${id}')"
+            >למלא ${targetK}k</button>
+
+            <button
+              type="button"
+              class="btn-secondary"
+              onclick="markRefilled('${id}')"
+            >סמן הטענה</button>
+
+            <button
+              type="button"
+              class="btn-remove"
+              title="הסר מסוף"
+              onclick="removeTerminal('${id}')"
+            >✕</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function updateStatsAndList(terminals) {
+      const listEl = document.getElementById("terminalsList");
+      listEl.innerHTML = terminals.map(renderTerminalCard).join("");
+
+      const totalBalance = terminals.reduce((acc, t) => acc + Number(t.balance ?? 0), 0);
+      const alertsCount = terminals.filter(
+        (t) => Number(t.balance ?? 0) <= Number(t.threshold ?? 3000)
+      ).length;
+      const totalPacks5k = terminals.reduce(
+        (acc, t) => acc + calcPacks5k(t.balance, t.baseTargetK),
+        0
+      );
+
+      document.getElementById("statCount").textContent = String(terminals.length);
+      document.getElementById("statAlerts").textContent = String(alertsCount);
+      document.getElementById("statBalance").textContent = `₪${formatAmountILS(totalBalance)}`;
+      document.getElementById("statPacks5k").textContent = String(totalPacks5k);
+    }
+
+    window.openEditTargetModal = async function (terminalId) {
+      if (!currentUser) return;
+      const t = currentTerminals.find((x) => String(x.id) === String(terminalId));
+      const currentK = t ? Number(t.baseTargetK ?? 15) : 15;
+      const input = prompt(`הזן יעד מילוי חדש באלפים (k) למסוף ${terminalId}:`, String(currentK));
+      if (input === null) return;
+      const parsedK = Number(input);
+      if (!Number.isFinite(parsedK) || parsedK < 0) {
+        alert("יש להזין מספר תקין באלפים");
+        return;
+      }
+      await db
+        .collection("distributors")
+        .doc(currentUser.uid)
+        .collection("terminals")
+        .doc(String(terminalId))
+        .set({ baseTargetK: parsedK }, { merge: true });
+    };
+
+    window.quickFillTerminal = async function (terminalId) {
+      if (!currentUser) return;
+      const t = currentTerminals.find((x) => String(x.id) === String(terminalId));
+      const targetAmount = Number(t?.baseTargetK ?? 15) * 1000;
+      await db
+        .collection("distributors")
+        .doc(currentUser.uid)
+        .collection("terminals")
+        .doc(String(terminalId))
+        .set({ balance: targetAmount, lastFilledAt: Date.now() }, { merge: true });
+    };
+
+    window.markRefilled = async function (terminalId) {
+      if (!currentUser) return;
+      await db
+        .collection("distributors")
+        .doc(currentUser.uid)
+        .collection("terminals")
+        .doc(String(terminalId))
+        .set({ lastRefilledAt: Date.now() }, { merge: true });
+    };
+
+    window.removeTerminal = async function (terminalId) {
+      if (!currentUser) return;
+      if (!confirm(`להסיר את מסוף ${terminalId} מהרשימה?`)) return;
+      await db
+        .collection("distributors")
+        .doc(currentUser.uid)
+        .collection("terminals")
+        .doc(String(terminalId))
+        .delete();
+    };
+
+    function renderDaysSelector(selectedDays = []) {
+      const wrap = document.getElementById("daysContainer");
+      wrap.innerHTML = DAYS.map((day, idx) => {
+        const checked = selectedDays.includes(idx) ? "checked" : "";
+        return `<label class="day-chip"><input type="checkbox" value="${idx}" ${checked} /> ${day}</label>`;
+      }).join("");
+    }
+
+    function bindUserListeners(uid) {
+      if (unsubscribeTerminals) unsubscribeTerminals();
+      if (unsubscribeCas) unsubscribeCas();
+
+      const userRef = db.collection("distributors").doc(uid);
+
+      userRef.collection("settings").doc("route").get().then((snap) => {
+        const days = snap.exists && Array.isArray(snap.data().days) ? snap.data().days : [0, 2, 4];
+        renderDaysSelector(days);
+      });
+
+      unsubscribeCas = userRef.collection("settings").doc("cas_sync").onSnapshot((snap) => {
+        const statusEl = document.getElementById("casSyncStatus");
+        if (!snap.exists) {
+          statusEl.textContent = "טרם הוגדרו פרטי כספונט.";
+          return;
+        }
+        const data = snap.data() || {};
+        if (data.username && !document.getElementById("casUserInput").value) {
+          document.getElementById("casUserInput").value = data.username;
+        }
+        if (data.syncRequested) {
+          statusEl.textContent = "בקשת סנכרון פעילה — ממתין להרצת הסנכרון...";
+        } else if (data.lastSyncError) {
+          statusEl.textContent = `שגיאת סנכרון: ${data.lastSyncError}`;
+        } else if (data.lastSyncedAt) {
+          const dt = new Date(Number(data.lastSyncedAt)).toLocaleString("he-IL");
+          statusEl.textContent = `סונכרן לאחרונה: ${dt} (${data.lastSyncCount ?? 0} מסופים)`;
+        }
+      });
+
+      unsubscribeTerminals = userRef.collection("terminals").onSnapshot((snap) => {
+        currentTerminals = snap.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => Number(a.order ?? 999) - Number(b.order ?? 999));
+        updateStatsAndList(currentTerminals);
+      });
+    }
+
+    document.getElementById("loginBtn").addEventListener("click", async () => {
+      document.getElementById("authError").textContent = "";
+      const email = document.getElementById("emailInput").value.trim();
+      const pass = document.getElementById("passwordInput").value;
+      try {
+        await auth.signInWithEmailAndPassword(email, pass);
+      } catch (err) {
+        document.getElementById("authError").textContent = err.message;
+      }
+    });
+
+    document.getElementById("registerBtn").addEventListener("click", async () => {
+      document.getElementById("authError").textContent = "";
+      const email = document.getElementById("emailInput").value.trim();
+      const pass = document.getElementById("passwordInput").value;
+      try {
+        const cred = await auth.createUserWithEmailAndPassword(email, pass);
+        const now = Date.now();
+        await db.collection("distributors").doc(cred.user.uid).set({
+          email,
+          subscriptionStatus: "trial",
+          trialEndsAt: now + 14 * 24 * 60 * 60 * 1000,
+          createdAt: now
+        }, { merge: true });
+      } catch (err) {
+        document.getElementById("authError").textContent = err.message;
+      }
+    });
+
+    document.getElementById("logoutBtn").addEventListener("click", () => auth.signOut());
+
+    document.getElementById("toggleRouteBtn").addEventListener("click", () => {
+      document.getElementById("routePanel").classList.toggle("hidden");
+    });
+
+    document.getElementById("toggleCasBtn").addEventListener("click", () => {
+      document.getElementById("casPanel").classList.toggle("hidden");
+    });
+
+    document.getElementById("saveRouteBtn").addEventListener("click", async () => {
+      if (!currentUser) return;
+      const days = [...document.querySelectorAll("#daysContainer input:checked")].map((el) => Number(el.value));
+      await db.collection("distributors").doc(currentUser.uid).collection("settings").doc("route").set({
+        days,
+        updatedAt: Date.now()
+      }, { merge: true });
+      document.getElementById("routeSavedMsg").textContent = "נשמר";
+      setTimeout(() => { document.getElementById("routeSavedMsg").textContent = ""; }, 2000);
+    });
+
+    document.getElementById("saveAndSyncCasBtn").addEventListener("click", async () => {
+      if (!currentUser) return;
+      const username = document.getElementById("casUserInput").value.trim();
+      const password = document.getElementById("casPassInput").value;
+      if (!username || !password) {
+        alert("יש להזין שם משתמש וסיסמה של כספונט");
+        return;
+      }
+      await db.collection("distributors").doc(currentUser.uid).collection("settings").doc("cas_sync").set({
+        username,
+        password,
+        syncRequested: true,
+        updatedAt: Date.now()
+      }, { merge: true });
+    });
+
+    document.getElementById("whatsappBtn").addEventListener("click", () => {
+      const lines = ["*דוח מצב מסופים — ATM Pro*"];
+      currentTerminals.forEach((t) => {
+        const packs = calcPacks5k(t.balance, t.baseTargetK);
+        lines.push(`• ${t.name} (${t.id}): יתרה ₪${formatAmountILS(t.balance)} | יעד ${t.baseTargetK ?? 15}k | יחידות 5k: ${packs}`);
+      });
+      const url = `https://wa.me/?text=${encodeURIComponent(lines.join("\n"))}`;
+      window.open(url, "_blank");
+    });
+
+    auth.onAuthStateChanged((user) => {
+      currentUser = user;
+      if (user) {
+        document.getElementById("authSection").classList.add("hidden");
+        document.getElementById("appSection").classList.remove("hidden");
+        document.getElementById("userEmailBadge").textContent = user.email || "";
+        bindUserListeners(user.uid);
+      } else {
+        if (unsubscribeTerminals) unsubscribeTerminals();
+        if (unsubscribeCas) unsubscribeCas();
+        document.getElementById("appSection").classList.add("hidden");
+        document.getElementById("authSection").classList.remove("hidden");
+      }
+    });
+  </script>
+</body>
+</html>
