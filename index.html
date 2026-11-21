@@ -223,6 +223,12 @@
       color: #fff;
     }
 
+    .btn-danger {
+      background: #fef2f2;
+      border-color: #fca5a5;
+      color: #b91c1c;
+    }
+
     .auth-box {
       max-width: 420px;
       margin: 50px auto;
@@ -294,8 +300,8 @@
         <span id="userEmailBadge" class="status-note"></span>
       </div>
       <div class="toolbar">
-        <input id="searchInput" type="search" placeholder="חיפוש מסוף / מספר..." style="width:175px;padding:6px 10px;" />
-        <button id="cleanupStaleBtn" type="button">🧹 נקה מיותרים</button>
+        <input id="searchInput" type="search" placeholder="חיפוש מסוף / מספר..." style="width:170px;padding:6px 10px;" />
+        <button id="resetAndSeedBtn" type="button" class="btn-danger">🗑️ נקה והזן מחדש</button>
         <button id="toggleRouteBtn" type="button">📅 ימי קו</button>
         <button id="toggleCasBtn" type="button">🏦 כספונט</button>
         <button id="whatsappBtn" type="button" class="btn-whatsapp">💬 וואטסאפ</button>
@@ -368,6 +374,27 @@
     const EXCLUDED_TERMINAL_IDS = new Set(["6004159"]);
     const LOW_THRESHOLD_2K_NAMES = ["גבעת רם", "ננקיקו לוקו"];
     const LOW_THRESHOLD_2K_IDS = new Set(["6008765"]);
+
+    const INITIAL_TERMINALS = [
+      { id: "6008765", name: "גבעת רם", balance: 0, baseTargetK: 15, order: 1 },
+      { id: "6003694", name: "צמיגי גילה", balance: 0, baseTargetK: 15, order: 2 },
+      { id: "6004164", name: "יולו", balance: 0, baseTargetK: 15, order: 3 },
+      { id: "6002836", name: "אל רחמה", balance: 0, baseTargetK: 15, order: 4 },
+      { id: "6007267", name: "רמי בשר", balance: 0, baseTargetK: 15, order: 5 },
+      { id: "6004870", name: "זיל הזול", balance: 0, baseTargetK: 15, order: 6 },
+      { id: "6003809", name: "מכולת צפפא", balance: 0, baseTargetK: 15, order: 7 },
+      { id: "6001001", name: "יפו פינת שדרות שרי ישראל", balance: 0, baseTargetK: 15, order: 8 },
+      { id: "6001002", name: "סטאר קפה", balance: 0, baseTargetK: 15, order: 9 },
+      { id: "6001003", name: "סלמאן", balance: 0, baseTargetK: 15, order: 10 },
+      { id: "6001004", name: "אאילאת", balance: 0, baseTargetK: 15, order: 11 },
+      { id: "6001005", name: "עולם המעשן", balance: 0, baseTargetK: 15, order: 12 },
+      { id: "6001006", name: "זערור", balance: 0, baseTargetK: 15, order: 13 },
+      { id: "6001007", name: "מלך השניצל", balance: 0, baseTargetK: 15, order: 14 },
+      { id: "6001008", name: "פרדוס", balance: 0, baseTargetK: 15, order: 15 },
+      { id: "6001009", name: "מר זול", balance: 0, baseTargetK: 15, order: 16 },
+      { id: "6001010", name: "דרך קרית היובל 4 (נעלימה)", balance: 0, baseTargetK: 15, order: 17 },
+      { id: "6001011", name: "פרקטי / אלה רזידנס", balance: 0, baseTargetK: 15, order: 18 }
+    ];
 
     let currentUser = null;
     let currentTerminals = [];
@@ -522,6 +549,42 @@
       document.getElementById("statPacks5k").textContent = String(totalPacks5k);
     }
 
+    async function commitInChunks(ops) {
+      const chunkSize = 400;
+      for (let i = 0; i < ops.length; i += chunkSize) {
+        const batch = db.batch();
+        ops.slice(i, i + chunkSize).forEach((fn) => fn(batch));
+        await batch.commit();
+      }
+    }
+
+    document.getElementById("resetAndSeedBtn").addEventListener("click", async () => {
+      if (!currentUser) return;
+      if (!confirm("למחוק את כל 109 המסמכים הקיימים ב-Firestore ולהזין מחדש את 18 המסופים של הקו?")) {
+        return;
+      }
+      const colRef = db.collection("distributors").doc(currentUser.uid).collection("terminals");
+      const snap = await colRef.get();
+      const deleteOps = snap.docs.map((doc) => (batch) => batch.delete(doc.ref));
+      await commitInChunks(deleteOps);
+
+      const seedOps = INITIAL_TERMINALS.map((t) => (batch) => {
+        batch.set(
+          colRef.doc(String(t.id)),
+          {
+            name: t.name,
+            balance: t.balance,
+            baseTargetK: t.baseTargetK,
+            order: t.order,
+            updatedAt: Date.now()
+          },
+          { merge: true }
+        );
+      });
+      await commitInChunks(seedOps);
+      alert("הרשימה נוקתה והוזנה מחדש עם 18 מסופים.");
+    });
+
     window.openEditBalanceModal = async function (terminalId) {
       if (!currentUser) return;
       const t = currentTerminals.find((x) => String(x.id) === String(terminalId));
@@ -592,25 +655,6 @@
         .doc(String(terminalId))
         .delete();
     };
-
-    document.getElementById("cleanupStaleBtn").addEventListener("click", async () => {
-      if (!currentUser) return;
-      const snap = await db
-        .collection("distributors")
-        .doc(currentUser.uid)
-        .collection("terminals")
-        .get();
-      const invalidDocs = snap.docs.filter((d) => !isValidTerminalDoc(d.id, d.data()));
-      if (invalidDocs.length === 0) {
-        alert("לא נמצאו מסמכים לא תקינים למחיקה ב-Firestore.");
-        return;
-      }
-      if (!confirm(`למחוק ${invalidDocs.length} מסמכים לא תקינים/מוחרגים מ-Firestore?`)) return;
-      const batch = db.batch();
-      invalidDocs.forEach((d) => batch.delete(d.ref));
-      await batch.commit();
-      alert(`נמחקו ${invalidDocs.length} מסמכים.`);
-    });
 
     function renderDaysSelector(selectedDays = []) {
       const wrap = document.getElementById("daysContainer");
