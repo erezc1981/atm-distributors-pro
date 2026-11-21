@@ -290,6 +290,7 @@
         <span id="userEmailBadge" class="status-note"></span>
       </div>
       <div class="toolbar">
+        <input id="searchInput" type="search" placeholder="חיפוש מסוף / מספר..." style="width:190px;padding:6px 10px;" />
         <button id="toggleRouteBtn" type="button">📅 ימי קו</button>
         <button id="toggleCasBtn" type="button">🏦 כספונט</button>
         <button id="whatsappBtn" type="button" class="btn-whatsapp">💬 וואטסאפ</button>
@@ -361,11 +362,22 @@
     const DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
     const EXCLUDED_TERMINAL_IDS = new Set(["6004159"]);
     const LOW_THRESHOLD_2K_NAMES = ["גבעת רם", "ננקיקו לוקו"];
+    const LOW_THRESHOLD_2K_IDS = new Set(["6008765"]);
 
     let currentUser = null;
     let currentTerminals = [];
+    let searchQuery = "";
     let unsubscribeTerminals = null;
     let unsubscribeCas = null;
+
+    function isValidTerminalDoc(docId, data) {
+      const idStr = String(docId ?? "").trim();
+      if (!/^\d{5,10}$/.test(idStr)) return false;
+      if (EXCLUDED_TERMINAL_IDS.has(idStr)) return false;
+      if (!data || typeof data !== "object") return false;
+      if (data.isLog === true || data.type === "log" || data.type === "summary") return false;
+      return true;
+    }
 
     function formatAmountILS(val) {
       const num = Number(val ?? 0);
@@ -373,11 +385,12 @@
     }
 
     function getTerminalThreshold(t) {
-      if (t.threshold !== undefined && t.threshold !== null && t.threshold !== "") {
-        return Number(t.threshold);
-      }
+      const idStr = String(t.id ?? "").trim();
       const nameStr = String(t.name || "");
-      if (LOW_THRESHOLD_2K_NAMES.some((n) => nameStr.includes(n))) {
+      if (
+        LOW_THRESHOLD_2K_IDS.has(idStr) ||
+        LOW_THRESHOLD_2K_NAMES.some((n) => nameStr.includes(n))
+      ) {
         return 2000;
       }
       return 3000;
@@ -473,19 +486,28 @@
     }
 
     function updateStatsAndList(terminals) {
-      const listEl = document.getElementById("terminalsList");
-      listEl.innerHTML = terminals.map(renderTerminalCard).join("");
+      const q = searchQuery.trim().toLowerCase();
+      const filtered = q
+        ? terminals.filter(
+            (t) =>
+              String(t.name || "").toLowerCase().includes(q) ||
+              String(t.id || "").toLowerCase().includes(q)
+          )
+        : terminals;
 
-      const totalBalance = terminals.reduce((acc, t) => acc + Number(t.balance ?? 0), 0);
-      const alertsCount = terminals.filter(
+      const listEl = document.getElementById("terminalsList");
+      listEl.innerHTML = filtered.map(renderTerminalCard).join("");
+
+      const totalBalance = filtered.reduce((acc, t) => acc + Number(t.balance ?? 0), 0);
+      const alertsCount = filtered.filter(
         (t) => Number(t.balance ?? 0) <= getTerminalThreshold(t)
       ).length;
-      const totalPacks5k = terminals.reduce(
+      const totalPacks5k = filtered.reduce(
         (acc, t) => acc + calcPacks5k(t.balance, getEffectiveTargetK(t)),
         0
       );
 
-      document.getElementById("statCount").textContent = String(terminals.length);
+      document.getElementById("statCount").textContent = String(filtered.length);
       document.getElementById("statAlerts").textContent = String(alertsCount);
       document.getElementById("statBalance").textContent = `₪${formatAmountILS(totalBalance)}`;
       document.getElementById("statPacks5k").textContent = String(totalPacks5k);
@@ -584,12 +606,17 @@
 
       unsubscribeTerminals = userRef.collection("terminals").onSnapshot((snap) => {
         currentTerminals = snap.docs
+          .filter((d) => isValidTerminalDoc(d.id, d.data()))
           .map((d) => ({ id: d.id, ...d.data() }))
-          .filter((t) => !EXCLUDED_TERMINAL_IDS.has(String(t.id)))
           .sort((a, b) => Number(a.order ?? 999) - Number(b.order ?? 999));
         updateStatsAndList(currentTerminals);
       });
     }
+
+    document.getElementById("searchInput").addEventListener("input", (e) => {
+      searchQuery = e.target.value || "";
+      updateStatsAndList(currentTerminals);
+    });
 
     document.getElementById("loginBtn").addEventListener("click", async () => {
       document.getElementById("authError").textContent = "";
