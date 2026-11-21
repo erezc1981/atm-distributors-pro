@@ -145,7 +145,8 @@
     }
     .status-banner {
       background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a;
-      padding: 10px 14px; border-radius: 12px; margin-bottom: 14px; font-size: 0.85rem;
+      padding: 12px 14px; border-radius: 12px; margin-bottom: 14px; font-size: 0.85rem;
+      display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;
     }
     .hidden { display: none !important; }
   </style>
@@ -207,7 +208,6 @@
   </div>
 </div>
 
-<!-- שלב 1 בהתקנה: בחירת ימי הפעלת הקו -->
 <div id="wizardSection" class="wizard-box hidden">
   <h2 style="margin-top:0;">הגדרת ימי הפעלת הקו</h2>
   <p style="color:var(--muted); font-size:0.88rem;">
@@ -240,11 +240,10 @@
   <div id="wizardMsg" style="color:#dc2626; font-size:0.85rem; margin-top:8px;"></div>
 </div>
 
-<!-- שלב 2 בהתקנה: פרטי התחברות לכספונט -->
 <div id="casLoginSection" class="cas-box hidden">
   <h2 style="margin-top:0;">התחברות לכספונט (CAS Mobile)</h2>
   <p style="color:var(--muted); font-size:0.88rem;">
-    הזן את פרטי הכניסה לחשבון הכספונט שלך (<code>casmobile.co.il</code>) כדי למשוך אוטומטית את המסופים והיתרות שלך למרחב המבודד שלך.
+    הזן את פרטי הכניסה לחשבון הכספונט שלך (<code>casmobile.co.il</code>) למשיכת המסופים והיתרות למרחב המבודד שלך.
   </p>
 
   <div class="field">
@@ -268,7 +267,8 @@
 
 <div id="mainDashboard" class="container hidden">
   <div id="emptyTerminalsBanner" class="status-banner hidden">
-    ימי הקו ופרטי כספונט נשמרו. המסופים ימשכו אוטומטית מהסנכרון שלך מול כספונט, ובנוסף ניתן להוסיף או לעדכן מסופים ויעדים כאן למטה.
+    <span id="casSyncStatusText">פרטי כספונט נשמרו. ממתין להרצת סנכרון כספונט כדי למשוך את המסופים והיתרות (או הוסף מסוף למטה).</span>
+    <button class="btn btn-primary" onclick="requestCasSyncNow()">🔄 רענן סנכרון כספונט</button>
   </div>
 
   <div class="summary-grid">
@@ -303,7 +303,7 @@
   <div id="terminalList" class="terminal-list"></div>
 
   <div class="add-term-card">
-    <strong style="width:100%; font-size:0.9rem;">הוספת מסוף לקו שלי:</strong>
+    <strong style="width:100%; font-size:0.9rem;">הוספת / עדכון מסוף לקו שלי:</strong>
     <input id="newTermId" type="text" placeholder="מזהה מסוף (למשל 6001234)" style="width:165px;" />
     <input id="newTermName" type="text" placeholder="שם המסוף / מיקום" style="flex:1; min-width:160px;" />
     <input id="newTermTarget" type="number" min="1" value="15" placeholder="יעד למסוף (באלפים)" style="width:130px;" />
@@ -319,7 +319,7 @@
     createUserWithEmailAndPassword, signOut
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import {
-    getFirestore, doc, getDoc, setDoc, collection, getDocs, deleteDoc
+    getFirestore, doc, getDoc, setDoc, collection, deleteDoc, onSnapshot
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -352,6 +352,7 @@
   let selectedDayIdx = getDefaultDayIdx();
   let terminals = [];
   let completedToday = {};
+  let unsubscribeTerminals = null;
 
   function getDefaultDayIdx() {
     const d = new Date().getDay();
@@ -408,6 +409,10 @@
   };
 
   window.logoutUser = async function() {
+    if (unsubscribeTerminals) {
+      unsubscribeTerminals();
+      unsubscribeTerminals = null;
+    }
     await signOut(auth);
   };
 
@@ -604,26 +609,40 @@
     await openDashboardView();
   };
 
+  window.requestCasSyncNow = async function() {
+    if (!currentUser) return;
+    document.getElementById("casSyncStatusText").textContent = "נשלחה בקשת סנכרון מול כספונט...";
+    try {
+      await setDoc(doc(db, "distributors", currentUser.uid, "settings", "cas_sync"), {
+        syncRequested: true,
+        updatedAt: Date.now()
+      }, { merge: true });
+    } catch (_) {}
+  };
+
   window.skipCasAndGoDashboard = async function() {
     await openDashboardView();
   };
+
+  function subscribeToTerminals() {
+    if (unsubscribeTerminals) unsubscribeTerminals();
+    const colRef = collection(db, "distributors", currentUser.uid, "terminals");
+    unsubscribeTerminals = onSnapshot(colRef, (snap) => {
+      const loaded = [];
+      snap.forEach(d => loaded.push({ docId: d.id, ...d.data() }));
+      loaded.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+      terminals = loaded;
+      renderDashboard();
+    }, () => {});
+  }
 
   async function openDashboardView() {
     if (!routeSettings.activeDays.includes(selectedDayIdx)) {
       selectedDayIdx = routeSettings.activeDays[0] ?? 0;
     }
-    await loadTerminals();
+    subscribeToTerminals();
     showSection("mainDashboard");
     renderDashboard();
-  }
-
-  async function loadTerminals() {
-    terminals = [];
-    try {
-      const snap = await getDocs(collection(db, "distributors", currentUser.uid, "terminals"));
-      snap.forEach(d => terminals.push({ docId: d.id, ...d.data() }));
-      terminals.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
-    } catch (_) {}
   }
 
   function calculateFillUnits(balance, targetUnits) {
@@ -666,13 +685,14 @@
       balance: 0,
       order: terminals.length + 1
     };
-    terminals.push({ docId: id, ...item });
     document.getElementById("newTermId").value = "";
     document.getElementById("newTermName").value = "";
-    renderDashboard();
     try {
       await setDoc(doc(db, "distributors", currentUser.uid, "terminals", id), item);
-    } catch (_) {}
+    } catch (_) {
+      terminals.push({ docId: id, ...item });
+      renderDashboard();
+    }
   };
 
   window.removeTerminal = async function(docId) {
