@@ -15,6 +15,9 @@
       --muted: #6b7280;
       --primary: #1d4ed8;
       --primary-soft: #eff6ff;
+      --success-soft: #f0fdf4;
+      --success-border: #bbf7d0;
+      --success: #15803d;
       --border: #e5e7eb;
     }
 
@@ -101,10 +104,10 @@
       flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
-      padding: 12px 16px;
+      gap: 14px;
+      padding: 14px 18px;
       margin-bottom: 10px;
-      border-radius: 10px;
+      border-radius: 12px;
       background: var(--alert-bg);
       border: 1px solid var(--alert-border);
     }
@@ -114,6 +117,26 @@
       border-color: var(--border);
     }
 
+    .terminal-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .row-index {
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      background: #e5e7eb;
+      color: #111827;
+      font-weight: 800;
+      font-size: 0.85rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
     .terminal-header {
       display: flex;
       flex-direction: column;
@@ -121,18 +144,13 @@
     }
 
     .terminal-title {
-      font-weight: 700;
+      font-weight: 800;
       font-size: 1rem;
     }
 
-    .terminal-id {
-      font-weight: 500;
-      color: var(--muted);
-    }
-
     .terminal-meta {
-      font-size: 0.9rem;
-      color: #374151;
+      font-size: 0.86rem;
+      color: var(--muted);
       display: flex;
       flex-wrap: wrap;
       align-items: center;
@@ -142,15 +160,15 @@
     .target-inline {
       display: inline-flex;
       align-items: center;
-      gap: 4px;
+      gap: 3px;
     }
 
     .icon-edit-btn {
       background: transparent;
       border: none;
-      padding: 2px 5px;
+      padding: 1px 4px;
       cursor: pointer;
-      font-size: 0.95rem;
+      font-size: 0.9rem;
       line-height: 1;
       border-radius: 6px;
     }
@@ -159,33 +177,46 @@
       background: rgba(0, 0, 0, 0.08);
     }
 
-    .terminal-controls {
+    .terminal-left {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: 8px;
+      gap: 14px;
     }
 
-    .cassette-box {
+    .metric-col {
       display: flex;
       flex-direction: column;
       align-items: center;
-      min-width: 125px;
-      padding: 5px 12px;
-      border-radius: 8px;
-      background: #ffffff;
-      border: 1px solid #d1d5db;
+      min-width: 82px;
     }
 
-    .cassette-label {
-      font-size: 0.75rem;
+    .metric-label {
+      font-size: 0.74rem;
       color: var(--muted);
     }
 
-    .cassette-amount {
+    .metric-val {
       font-weight: 800;
-      font-size: 1.05rem;
+      font-size: 1rem;
       color: var(--text);
+    }
+
+    .fill-display {
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      background: var(--primary-soft);
+      border: 1px solid #93c5fd;
+      color: var(--primary);
+      white-space: nowrap;
+    }
+
+    .fill-display.ok-badge {
+      background: var(--success-soft);
+      border-color: var(--success-border);
+      color: var(--success);
     }
 
     button {
@@ -203,12 +234,6 @@
       background: var(--primary);
       border-color: var(--primary);
       color: #fff;
-    }
-
-    .btn-fill {
-      background: var(--primary-soft);
-      border-color: #93c5fd;
-      color: var(--primary);
     }
 
     .btn-whatsapp {
@@ -284,14 +309,14 @@
   <div id="appSection" class="hidden">
     <header class="topbar">
       <div class="brand">
-        <span>ATM Pro — מפיצים</span>
+        <span>ATM Pro — ניהול קו כספומטים</span>
         <span id="userEmailBadge" class="status-note"></span>
       </div>
       <div class="toolbar">
         <input id="searchInput" type="search" placeholder="חיפוש מסוף / מספר..." style="width:185px;padding:6px 10px;" />
         <button id="toggleRouteBtn" type="button">📅 ימי קו</button>
         <button id="toggleCasBtn" type="button">🏦 כספונט</button>
-        <button id="whatsappBtn" type="button" class="btn-whatsapp">💬 וואטסאפ</button>
+        <button id="whatsappBtn" type="button" class="btn-whatsapp">💬 שלח לוואטסאפ</button>
         <button id="logoutBtn" type="button">יציאה</button>
       </div>
     </header>
@@ -319,20 +344,24 @@
       <!-- סיכום נתונים -->
       <section class="stats-grid">
         <div class="stat-box">
-          <div class="stat-label">מסופים במעקב</div>
+          <div class="stat-label">מסופים פעילים</div>
           <div id="statCount" class="stat-value">0</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">במחסנית</div>
+          <div id="statBalance" class="stat-value">₪0</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">נותר להטעין במסלול</div>
+          <div id="statToLoad" class="stat-value">₪0</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">חבילות 5k מהבנק</div>
+          <div id="statPacks5k" class="stat-value">0</div>
         </div>
         <div class="stat-box">
           <div class="stat-label">התראות יתרה נמוכה</div>
           <div id="statAlerts" class="stat-value">0</div>
-        </div>
-        <div class="stat-box">
-          <div class="stat-label">סה״כ יתרה במחסניות</div>
-          <div id="statBalance" class="stat-value">₪0</div>
-        </div>
-        <div class="stat-box">
-          <div class="stat-label">סה״כ יחידות 5,000 ₪ למילוי</div>
-          <div id="statPacks5k" class="stat-value">0</div>
         </div>
       </section>
 
@@ -395,33 +424,56 @@
       return Math.max(0, Math.round(baseK * factor));
     }
 
-    function calcPacks5k(balance, targetK) {
+    function calcLoadAmountILS(balance, targetK) {
       const targetAmount = Number(targetK ?? 15) * 1000;
       const currentBal = Number(balance ?? 0);
-      const diff = Math.max(0, targetAmount - currentBal);
-      return Math.round(diff / 5000);
+      return Math.max(0, targetAmount - currentBal);
     }
 
-    function renderTerminalCard(t) {
+    function calcPacks5k(loadAmountILS) {
+      return Math.round(Number(loadAmountILS ?? 0) / 5000);
+    }
+
+    function renderTerminalCard(t, index) {
       const id = String(t.id ?? "");
       const name = String(t.name ?? `מסוף ${id}`);
       const thresholdNum = getTerminalThreshold(t);
       const threshold = formatAmountILS(thresholdNum);
       const targetK = getEffectiveTargetK(t);
-      const packs5k = calcPacks5k(t.balance, targetK);
       const rawBalance = Number(t.balance ?? 0);
       const balanceFormatted = formatAmountILS(rawBalance);
+      const loadAmount = calcLoadAmountILS(rawBalance, targetK);
+      const packs5k = calcPacks5k(loadAmount);
       const isAlert = rawBalance <= thresholdNum;
+
+      const fillLabelHtml = loadAmount > 0
+        ? `<span class="fill-display">למלא ₪${formatAmountILS(loadAmount)} (${packs5k}×5k)</span>`
+        : `<span class="fill-display ok-badge">תקין (0)</span>`;
 
       return `
         <div class="terminal-card ${isAlert ? "" : "ok"}" data-terminal-id="${id}">
-          <div class="terminal-header">
-            <div class="terminal-title">${name} <span class="terminal-id">(${id})</span></div>
-            <div class="terminal-meta">
-              <span>סף התראה: ₪${threshold}</span>
-              <span>•</span>
+          <div class="terminal-right">
+            <span class="row-index">${index + 1}</span>
+            <div class="terminal-header">
+              <div class="terminal-title">${name}</div>
+              <div class="terminal-meta">
+                <span>מזהה: ${id}</span>
+                <span>•</span>
+                <span>סף התראה: ₪${threshold}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="terminal-left">
+            <div class="metric-col">
+              <span class="metric-label">במחסנית</span>
+              <span class="metric-val">₪${balanceFormatted}</span>
+            </div>
+
+            <div class="metric-col">
+              <span class="metric-label">יעד מילוי</span>
               <span class="target-inline">
-                <span>יעד מילוי: <strong id="target-val-${id}">${targetK}k</strong></span>
+                <strong class="metric-val" id="target-val-${id}">${targetK}k</strong>
                 <button
                   type="button"
                   class="icon-edit-btn"
@@ -430,35 +482,14 @@
                   onclick="openEditTargetModal('${id}')"
                 >✏️</button>
               </span>
-              <span>•</span>
-              <span>יחידות 5k: <strong>${packs5k}</strong></span>
             </div>
-          </div>
 
-          <div class="terminal-controls">
-            <div class="cassette-box">
-              <span class="cassette-label">במחסנית (₪)</span>
-              <span class="cassette-amount" id="cassette-val-${id}">${balanceFormatted}</span>
-            </div>
+            ${fillLabelHtml}
 
             <button
               type="button"
-              class="btn-fill"
-              onclick="quickFillTerminal('${id}')"
-            >למלא ${targetK}k</button>
-
-            <button
-              type="button"
-              class="btn-secondary"
               onclick="markRefilled('${id}')"
             >סמן הטענה</button>
-
-            <button
-              type="button"
-              class="btn-remove"
-              title="הסר מסוף"
-              onclick="removeTerminal('${id}')"
-            >✕</button>
           </div>
         </div>
       `;
@@ -478,22 +509,27 @@
       if (!filtered.length) {
         listEl.innerHTML = `<div class="panel status-note">אין מסופים להצגה. לחץ על "כספונט" כדי לבקש סנכרון לחשבון זה.</div>`;
       } else {
-        listEl.innerHTML = filtered.map(renderTerminalCard).join("");
+        listEl.innerHTML = filtered.map((t, idx) => renderTerminalCard(t, idx)).join("");
       }
 
       const totalBalance = filtered.reduce((acc, t) => acc + Number(t.balance ?? 0), 0);
+      const totalToLoad = filtered.reduce(
+        (acc, t) => acc + calcLoadAmountILS(t.balance, getEffectiveTargetK(t)),
+        0
+      );
+      const totalPacks5k = filtered.reduce(
+        (acc, t) => acc + calcPacks5k(calcLoadAmountILS(t.balance, getEffectiveTargetK(t))),
+        0
+      );
       const alertsCount = filtered.filter(
         (t) => Number(t.balance ?? 0) <= getTerminalThreshold(t)
       ).length;
-      const totalPacks5k = filtered.reduce(
-        (acc, t) => acc + calcPacks5k(t.balance, getEffectiveTargetK(t)),
-        0
-      );
 
       document.getElementById("statCount").textContent = String(filtered.length);
-      document.getElementById("statAlerts").textContent = String(alertsCount);
       document.getElementById("statBalance").textContent = `₪${formatAmountILS(totalBalance)}`;
+      document.getElementById("statToLoad").textContent = `₪${formatAmountILS(totalToLoad)}`;
       document.getElementById("statPacks5k").textContent = String(totalPacks5k);
+      document.getElementById("statAlerts").textContent = String(alertsCount);
     }
 
     window.openEditTargetModal = async function (terminalId) {
@@ -515,18 +551,6 @@
         .set({ baseTargetK: parsedK }, { merge: true });
     };
 
-    window.quickFillTerminal = async function (terminalId) {
-      if (!currentUser) return;
-      const t = currentTerminals.find((x) => String(x.id) === String(terminalId));
-      const targetAmount = getEffectiveTargetK(t || {}) * 1000;
-      await db
-        .collection("distributors")
-        .doc(currentUser.uid)
-        .collection("terminals")
-        .doc(String(terminalId))
-        .set({ balance: targetAmount, lastFilledAt: Date.now() }, { merge: true });
-    };
-
     window.markRefilled = async function (terminalId) {
       if (!currentUser) return;
       await db
@@ -535,17 +559,6 @@
         .collection("terminals")
         .doc(String(terminalId))
         .set({ lastRefilledAt: Date.now() }, { merge: true });
-    };
-
-    window.removeTerminal = async function (terminalId) {
-      if (!currentUser) return;
-      if (!confirm(`להסיר את מסוף ${terminalId} מהרשימה?`)) return;
-      await db
-        .collection("distributors")
-        .doc(currentUser.uid)
-        .collection("terminals")
-        .doc(String(terminalId))
-        .delete();
     };
 
     function renderDaysSelector(selectedDays = []) {
@@ -668,10 +681,11 @@
 
     document.getElementById("whatsappBtn").addEventListener("click", () => {
       const lines = ["*דוח מצב מסופים — ATM Pro*"];
-      currentTerminals.forEach((t) => {
+      currentTerminals.forEach((t, idx) => {
         const targetK = getEffectiveTargetK(t);
-        const packs = calcPacks5k(t.balance, targetK);
-        lines.push(`• ${t.name} (${t.id}): יתרה ₪${formatAmountILS(t.balance)} | יעד ${targetK}k | יחידות 5k: ${packs}`);
+        const loadAmt = calcLoadAmountILS(t.balance, targetK);
+        const packs = calcPacks5k(loadAmt);
+        lines.push(`${idx + 1}. ${t.name} (${t.id}): מחסנית ₪${formatAmountILS(t.balance)} | יעד ${targetK}k | למלא ₪${formatAmountILS(loadAmt)} (${packs}×5k)`);
       });
       const url = `https://wa.me/?text=${encodeURIComponent(lines.join("\n"))}`;
       window.open(url, "_blank");
