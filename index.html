@@ -14,7 +14,7 @@
       --alert-banner: #dc2626;
       --text: #111827;
       --muted: #6b7280;
-      --primary: #1d4ed8;
+      --primary: #2563eb;
       --primary-soft: #eff6ff;
       --success-soft: #f0fdf4;
       --success-border: #bbf7d0;
@@ -36,9 +36,9 @@
       background: var(--alert-banner);
       color: #fff;
       text-align: center;
-      padding: 8px 16px;
-      font-weight: 700;
-      font-size: 0.92rem;
+      padding: 9px 16px;
+      font-weight: 800;
+      font-size: 0.94rem;
     }
 
     .topbar {
@@ -88,6 +88,16 @@
       border-radius: 999px;
     }
 
+    .auto-pill {
+      background: rgba(22, 163, 74, 0.22);
+      color: #bbf7d0;
+      border: 1px solid rgba(74, 222, 128, 0.4);
+      font-size: 0.76rem;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 999px;
+    }
+
     .toolbar {
       display: flex;
       flex-wrap: wrap;
@@ -96,7 +106,7 @@
     }
 
     .container {
-      max-width: 1080px;
+      max-width: 1120px;
       margin: 20px auto;
       padding: 0 16px 40px;
     }
@@ -106,39 +116,39 @@
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 16px;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
 
     .stats-top {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 12px;
-      margin-bottom: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 14px;
+      margin-bottom: 14px;
     }
 
     .stats-sub {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 12px;
-      margin-bottom: 18px;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 14px;
+      margin-bottom: 14px;
     }
 
     .stat-hero {
       background: #dbeafe;
       border: 1px solid #bfdbfe;
       border-radius: 12px;
-      padding: 18px 16px;
+      padding: 20px 16px;
       text-align: center;
     }
 
     .stat-hero-val {
-      font-size: 1.7rem;
+      font-size: 1.75rem;
       font-weight: 900;
       color: #0f172a;
     }
 
     .stat-hero-lbl {
-      font-size: 0.88rem;
+      font-size: 0.9rem;
       color: #334155;
       margin-top: 4px;
       font-weight: 600;
@@ -152,9 +162,80 @@
       text-align: center;
     }
 
-    .stat-label { font-size: 0.82rem; color: var(--muted); }
-    .stat-value { font-size: 1.35rem; font-weight: 800; margin-top: 4px; }
+    .stat-label { font-size: 0.84rem; color: var(--muted); font-weight: 600; }
+    .stat-value { font-size: 1.4rem; font-weight: 900; margin-top: 4px; }
     .stat-sub { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+
+    .rules-bar {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .rule-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .rule-group-label {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #374151;
+      min-width: 105px;
+    }
+
+    .chip-btn {
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      border: 1px solid #d1d5db;
+      background: #f9fafb;
+      color: #374151;
+      cursor: pointer;
+    }
+
+    .chip-btn.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+
+    .schedule-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 0.88rem;
+    }
+
+    .schedule-table th,
+    .schedule-table td {
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      text-align: center;
+    }
+
+    .schedule-table th {
+      background: #f8fafc;
+      font-weight: 700;
+    }
+
+    .schedule-table input[type="number"],
+    .schedule-table select {
+      width: 95px;
+      padding: 5px 8px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      text-align: center;
+      font-family: inherit;
+    }
 
     .terminal-card {
       display: flex;
@@ -200,9 +281,37 @@
       gap: 3px;
     }
 
+    .title-line {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
     .terminal-title {
       font-weight: 800;
       font-size: 1rem;
+    }
+
+    .sector-badge {
+      padding: 2px 9px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      border: 1px solid transparent;
+      cursor: pointer;
+    }
+
+    .sector-jewish {
+      background: #eff6ff;
+      color: #1d4ed8;
+      border-color: #bfdbfe;
+    }
+
+    .sector-arab {
+      background: #ecfdf5;
+      color: #047857;
+      border-color: #a7f3d0;
     }
 
     .terminal-meta {
@@ -317,24 +426,6 @@
       font-size: 0.95rem;
     }
 
-    .days-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin: 10px 0;
-    }
-
-    .day-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      background: #f9fafb;
-      border: 1px solid var(--border);
-      padding: 6px 10px;
-      border-radius: 8px;
-      font-size: 0.9rem;
-    }
-
     .hidden { display: none !important; }
     .status-note { font-size: 0.88rem; color: var(--muted); }
   </style>
@@ -361,6 +452,7 @@
 
   <!-- מסך ניהול ראשי -->
   <div id="appSection" class="hidden">
+    <!-- פיצר התראה למסופים נמוכים (מופיע רק כשיש התראה) -->
     <div id="alertBanner" class="alert-banner hidden"></div>
 
     <header class="topbar">
@@ -369,14 +461,15 @@
           <span class="atm-tag">ATM</span>
           <span>ניהול קו כספומטים</span>
         </div>
+        <span class="auto-pill">מצב אוטומטי פעיל</span>
         <span id="lastSyncPill" class="sync-pill">ממתין לסנכרון...</span>
         <span id="userEmailBadge" class="sync-pill"></span>
       </div>
 
       <div class="toolbar">
-        <input id="searchInput" type="search" placeholder="חיפוש מסוף / מספר..." style="width:175px;padding:6px 10px;color:#111827;" />
+        <input id="searchInput" type="search" placeholder="חיפוש מסוף / מספר..." style="width:165px;padding:6px 10px;color:#111827;" />
         <button id="refreshBtn" type="button">🔄 רענן</button>
-        <button id="toggleRouteBtn" type="button">📅 ימי קו</button>
+        <button id="toggleScheduleBtn" type="button">📊 טבלת טעינה וחגים</button>
         <button id="toggleCasBtn" type="button">🏦 כספונט</button>
         <button id="whatsappBtn" type="button" class="btn-whatsapp">💬 שלח לוואטסאפ</button>
         <button id="logoutBtn" type="button">יציאה</button>
@@ -384,12 +477,23 @@
     </header>
 
     <main class="container">
-      <!-- הגדרת ימי קו -->
-      <section id="routePanel" class="panel hidden">
-        <strong>הגדרת ימי קו</strong>
-        <div id="daysContainer" class="days-row"></div>
-        <button id="saveRouteBtn" type="button" class="btn-primary">שמור ימי קו</button>
-        <span id="routeSavedMsg" class="status-note"></span>
+      <!-- טבלת ימי הטענה וחגים -->
+      <section id="schedulePanel" class="panel hidden">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+          <strong>טבלת ימי הטענה, תקופות וחגים (אחוז התאמה ליעד מילוי)</strong>
+          <button id="saveScheduleTableBtn" type="button" class="btn-primary">שמור טבלה</button>
+        </div>
+        <table class="schedule-table">
+          <thead>
+            <tr>
+              <th>קטגוריה</th>
+              <th>מצב / תקופה</th>
+              <th>התאמה (%)</th>
+            </tr>
+          </thead>
+          <tbody id="scheduleTableBody"></tbody>
+        </table>
+        <div id="scheduleSavedMsg" class="status-note" style="margin-top:8px;"></div>
       </section>
 
       <!-- הגדרות וסנכרון כספונט -->
@@ -425,12 +529,38 @@
         <div class="stat-box">
           <div class="stat-label">חבילות 5k מהבנק</div>
           <div id="statPacks5k" class="stat-value" style="color:#15803d;">0</div>
-          <div class="stat-sub">למשיכה יומית מהבנק</div>
+          <div class="stat-sub">כולל עיגול לזוגות</div>
         </div>
         <div class="stat-box">
           <div class="stat-label">התראות יתרה נמוכה</div>
           <div id="statAlerts" class="stat-value" style="color:#dc2626;">0</div>
           <div class="stat-sub">מתחת לסף מינימום</div>
+        </div>
+      </section>
+
+      <!-- בחירת יום הטענה, תקופה בחודש ומגזרים -->
+      <section class="rules-bar">
+        <div class="rule-row">
+          <span class="rule-group-label">יום הטענה:</span>
+          <button type="button" class="chip-btn active" data-rule-group="refillDay" data-rule-val="midweek">ראשון / שלישי (יומיים)</button>
+          <button type="button" class="chip-btn" data-rule-group="refillDay" data-rule-val="thursday">חמישי (סופ"ש)</button>
+
+          <span class="rule-group-label" style="margin-right:14px;">תקופה בחודש:</span>
+          <button type="button" class="chip-btn active" data-rule-group="monthPeriod" data-rule-val="regular">רגיל</button>
+          <button type="button" class="chip-btn" data-rule-group="monthPeriod" data-rule-val="salaries">משכורות (8–12)</button>
+          <button type="button" class="chip-btn" data-rule-group="monthPeriod" data-rule-val="allowances">קצבאות (26–29)</button>
+        </div>
+
+        <div class="rule-row">
+          <span id="jewishCountLabel" class="rule-group-label">מגזר יהודי (0):</span>
+          <button type="button" class="chip-btn active" data-rule-group="jewishMode" data-rule-val="regular">רגיל</button>
+          <button type="button" class="chip-btn" data-rule-group="jewishMode" data-rule-val="eve_holiday">ערב חג (+35%)</button>
+          <button type="button" class="chip-btn" data-rule-group="jewishMode" data-rule-val="holiday">חג (-75%)</button>
+
+          <span id="arabCountLabel" class="rule-group-label" style="margin-right:14px;">מגזר ערבי (0):</span>
+          <button type="button" class="chip-btn active" data-rule-group="arabMode" data-rule-val="regular">רגיל</button>
+          <button type="button" class="chip-btn" data-rule-group="arabMode" data-rule-val="eve_eid">ערב חג / עיד (+35%)</button>
+          <button type="button" class="chip-btn" data-rule-group="arabMode" data-rule-val="ramadan">רמדאן (+15%)</button>
         </div>
       </section>
 
@@ -455,13 +585,42 @@
     const auth = firebase.auth();
     const db = firebase.firestore();
 
-    const DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+    const DEFAULT_ADJUSTMENTS = {
+      refillDay: { midweek: 0, thursday: 25 },
+      monthPeriod: { regular: 0, salaries: 15, allowances: 15 },
+      jewishMode: { regular: 0, eve_holiday: 35, holiday: -75 },
+      arabMode: { regular: 0, eve_eid: 35, ramadan: 15 }
+    };
+
+    const SCHEDULE_ROWS = [
+      { group: "refillDay", key: "midweek", category: "יום הטענה", label: 'ראשון / שלישי (יומיים)' },
+      { group: "refillDay", key: "thursday", category: "יום הטענה", label: 'חמישי (סופ"ש)' },
+      { group: "monthPeriod", key: "regular", category: "תקופה בחודש", label: "רגיל" },
+      { group: "monthPeriod", key: "salaries", category: "תקופה בחודש", label: "משכורות (8–12)" },
+      { group: "monthPeriod", key: "allowances", category: "תקופה בחודש", label: "קצבאות (26–29)" },
+      { group: "jewishMode", key: "regular", category: "מגזר יהודי", label: "רגיל" },
+      { group: "jewishMode", key: "eve_holiday", category: "מגזר יהודי", label: "ערב חג" },
+      { group: "jewishMode", key: "holiday", category: "מגזר יהודי", label: "חג" },
+      { group: "arabMode", key: "regular", category: "מגזר ערבי", label: "רגיל" },
+      { group: "arabMode", key: "eve_eid", category: "מגזר ערבי", label: "ערב חג / עיד" },
+      { group: "arabMode", key: "ramadan", category: "מגזר ערבי", label: "רמדאן" }
+    ];
 
     let currentUser = null;
     let currentTerminals = [];
     let searchQuery = "";
     let unsubscribeTerminals = null;
     let unsubscribeCas = null;
+    let unsubscribeSchedule = null;
+
+    let activeRules = {
+      refillDay: "midweek",
+      monthPeriod: "regular",
+      jewishMode: "regular",
+      arabMode: "regular"
+    };
+
+    let adjustmentsPct = JSON.parse(JSON.stringify(DEFAULT_ADJUSTMENTS));
 
     function formatAmountILS(val) {
       const num = Number(val ?? 0);
@@ -473,24 +632,21 @@
       return Number.isFinite(parsed) && parsed > 0 ? parsed : 3000;
     }
 
-    function isTenthAdjustmentDay(dateObj = new Date()) {
-      const dayOfMonth = dateObj.getDate();
-      return dayOfMonth >= 8 && dayOfMonth <= 12;
+    function getTerminalSector(t) {
+      return t.sector === "arab" ? "arab" : "jewish";
     }
 
-    function getEffectiveTargetK(t, dateObj = new Date()) {
+    function getEffectiveTargetK(t) {
       const baseK = Number(t.baseTargetK ?? 15);
-      const dayOfWeek = dateObj.getDay();
-      let factor = 1;
-      if (dayOfWeek === 4) {
-        factor = Number(t.thursdayMultiplier ?? 1.25);
-      } else if (dayOfWeek >= 1 && dayOfWeek <= 3) {
-        factor = Number(t.midweekMultiplier ?? 1);
-      }
-      if (isTenthAdjustmentDay(dateObj)) {
-        factor *= Number(t.tenthMultiplier ?? 1.15);
-      }
-      return Math.max(0, Math.round(baseK * factor));
+      const dayPct = Number(adjustmentsPct.refillDay?.[activeRules.refillDay] ?? 0);
+      const periodPct = Number(adjustmentsPct.monthPeriod?.[activeRules.monthPeriod] ?? 0);
+      const sector = getTerminalSector(t);
+      const sectorPct = sector === "arab"
+        ? Number(adjustmentsPct.arabMode?.[activeRules.arabMode] ?? 0)
+        : Number(adjustmentsPct.jewishMode?.[activeRules.jewishMode] ?? 0);
+
+      const totalFactor = (1 + dayPct / 100) * (1 + periodPct / 100) * (1 + sectorPct / 100);
+      return Math.max(0, Math.round(baseK * totalFactor));
     }
 
     function calcLoadAmountILS(balance, targetK) {
@@ -500,7 +656,38 @@
     }
 
     function calcPacks5k(loadAmountILS) {
-      return Math.round(Number(loadAmountILS ?? 0) / 5000);
+      const rawPacks = Math.round(Number(loadAmountILS ?? 0) / 5000);
+      return rawPacks > 0 && rawPacks % 2 === 1 ? rawPacks + 1 : rawPacks;
+    }
+
+    function renderScheduleTable() {
+      const tbody = document.getElementById("scheduleTableBody");
+      tbody.innerHTML = SCHEDULE_ROWS.map((r) => {
+        const val = adjustmentsPct[r.group]?.[r.key] ?? 0;
+        return `
+          <tr>
+            <td>${r.category}</td>
+            <td>${r.label}</td>
+            <td>
+              <input
+                type="number"
+                step="5"
+                data-adj-group="${r.group}"
+                data-adj-key="${r.key}"
+                value="${val}"
+              />
+            </td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    function syncRuleChipButtons() {
+      document.querySelectorAll(".chip-btn").forEach((btn) => {
+        const grp = btn.getAttribute("data-rule-group");
+        const v = btn.getAttribute("data-rule-val");
+        btn.classList.toggle("active", activeRules[grp] === v);
+      });
     }
 
     function renderTerminalCard(t, index) {
@@ -513,6 +700,9 @@
       const balanceFormatted = formatAmountILS(rawBalance);
       const loadAmount = calcLoadAmountILS(rawBalance, targetK);
       const isAlert = rawBalance <= thresholdNum;
+      const sector = getTerminalSector(t);
+      const sectorLabel = sector === "arab" ? "מגזר ערבי" : "מגזר יהודי";
+      const sectorClass = sector === "arab" ? "sector-arab" : "sector-jewish";
 
       const fillDisplayHtml = loadAmount > 0
         ? `<span class="fill-display">למלא ₪${formatAmountILS(loadAmount)}</span>`
@@ -523,7 +713,15 @@
           <div class="terminal-right">
             <span class="row-index">${index + 1}</span>
             <div class="terminal-header">
-              <div class="terminal-title">${name}</div>
+              <div class="title-line">
+                <span class="terminal-title">${name}</span>
+                <button
+                  type="button"
+                  class="sector-badge ${sectorClass}"
+                  title="לחץ להחלפת מגזר"
+                  onclick="toggleTerminalSector('${id}')"
+                >${sectorLabel}</button>
+              </div>
               <div class="terminal-meta">מזהה: ${id} • סף התראה: ₪${threshold}</div>
             </div>
           </div>
@@ -560,6 +758,11 @@
     }
 
     function updateStatsAndList(terminals) {
+      const jewishTotal = terminals.filter((t) => getTerminalSector(t) === "jewish").length;
+      const arabTotal = terminals.filter((t) => getTerminalSector(t) === "arab").length;
+      document.getElementById("jewishCountLabel").textContent = `מגזר יהודי (${jewishTotal}):`;
+      document.getElementById("arabCountLabel").textContent = `מגזר ערבי (${arabTotal}):`;
+
       const q = searchQuery.trim().toLowerCase();
       const filtered = q
         ? terminals.filter(
@@ -580,13 +783,15 @@
       const loads = filtered.map((t) => calcLoadAmountILS(t.balance, getEffectiveTargetK(t)));
       const totalToLoad = loads.reduce((acc, v) => acc + v, 0);
       const stationsToFill = loads.filter((v) => v > 0).length;
-      const totalPacks5k = loads.reduce((acc, v) => acc + calcPacks5k(v), 0);
+      const totalPacks5k = calcPacks5k(totalToLoad);
       const alertTerminals = filtered.filter((t) => Number(t.balance ?? 0) <= getTerminalThreshold(t));
 
       const bannerEl = document.getElementById("alertBanner");
       if (alertTerminals.length > 0) {
-        const previewNames = alertTerminals.slice(0, 3).map((t) => `${t.name} (₪${formatAmountILS(t.balance)})`).join(", ");
-        bannerEl.textContent = `🚨 התראת יתרה נמוכה ב-${alertTerminals.length} מסופים: ${previewNames}`;
+        const itemsText = alertTerminals
+          .map((t) => `${t.name} (₪${formatAmountILS(t.balance)})`)
+          .join(", ");
+        bannerEl.textContent = `🚨 התראת יתרה נמוכה ב-${alertTerminals.length} מסופים: ${itemsText}`;
         bannerEl.classList.remove("hidden");
       } else {
         bannerEl.classList.add("hidden");
@@ -599,6 +804,19 @@
       document.getElementById("statPacks5k").textContent = String(totalPacks5k);
       document.getElementById("statAlerts").textContent = String(alertTerminals.length);
     }
+
+    window.toggleTerminalSector = async function (terminalId) {
+      if (!currentUser) return;
+      const t = currentTerminals.find((x) => String(x.id) === String(terminalId));
+      if (!t) return;
+      const nextSector = getTerminalSector(t) === "arab" ? "jewish" : "arab";
+      await db
+        .collection("distributors")
+        .doc(currentUser.uid)
+        .collection("terminals")
+        .doc(String(terminalId))
+        .set({ sector: nextSector }, { merge: true });
+    };
 
     window.openEditTargetModal = async function (terminalId) {
       if (!currentUser) return;
@@ -629,23 +847,70 @@
         .set({ lastRefilledAt: Date.now() }, { merge: true });
     };
 
-    function renderDaysSelector(selectedDays = []) {
-      const wrap = document.getElementById("daysContainer");
-      wrap.innerHTML = DAYS.map((day, idx) => {
-        const checked = selectedDays.includes(idx) ? "checked" : "";
-        return `<label class="day-chip"><input type="checkbox" value="${idx}" ${checked} /> ${day}</label>`;
-      }).join("");
-    }
+    document.querySelectorAll(".chip-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const grp = btn.getAttribute("data-rule-group");
+        const val = btn.getAttribute("data-rule-val");
+        activeRules[grp] = val;
+        syncRuleChipButtons();
+        updateStatsAndList(currentTerminals);
+        if (currentUser) {
+          await db
+            .collection("distributors")
+            .doc(currentUser.uid)
+            .collection("settings")
+            .doc("schedule_rules")
+            .set({ activeRules, updatedAt: Date.now() }, { merge: true });
+        }
+      });
+    });
+
+    document.getElementById("saveScheduleTableBtn").addEventListener("click", async () => {
+      if (!currentUser) return;
+      document.querySelectorAll("#scheduleTableBody input[data-adj-group]").forEach((inp) => {
+        const grp = inp.getAttribute("data-adj-group");
+        const k = inp.getAttribute("data-adj-key");
+        const num = Number(inp.value);
+        if (!adjustmentsPct[grp]) adjustmentsPct[grp] = {};
+        adjustmentsPct[grp][k] = Number.isFinite(num) ? num : 0;
+      });
+      await db
+        .collection("distributors")
+        .doc(currentUser.uid)
+        .collection("settings")
+        .doc("schedule_rules")
+        .set({ adjustmentsPct, activeRules, updatedAt: Date.now() }, { merge: true });
+      updateStatsAndList(currentTerminals);
+      const msgEl = document.getElementById("scheduleSavedMsg");
+      msgEl.textContent = "טבלת ימי הטענה והחגים נשמרה.";
+      setTimeout(() => { msgEl.textContent = ""; }, 2500);
+    });
 
     function bindUserListeners(uid) {
       if (unsubscribeTerminals) unsubscribeTerminals();
       if (unsubscribeCas) unsubscribeCas();
+      if (unsubscribeSchedule) unsubscribeSchedule();
 
       const userRef = db.collection("distributors").doc(uid);
 
-      userRef.collection("settings").doc("route").get().then((snap) => {
-        const days = snap.exists && Array.isArray(snap.data().days) ? snap.data().days : [0, 2, 4];
-        renderDaysSelector(days);
+      unsubscribeSchedule = userRef.collection("settings").doc("schedule_rules").onSnapshot((snap) => {
+        if (snap.exists) {
+          const data = snap.data() || {};
+          if (data.activeRules) {
+            activeRules = { ...activeRules, ...data.activeRules };
+          }
+          if (data.adjustmentsPct) {
+            adjustmentsPct = {
+              refillDay: { ...DEFAULT_ADJUSTMENTS.refillDay, ...(data.adjustmentsPct.refillDay || {}) },
+              monthPeriod: { ...DEFAULT_ADJUSTMENTS.monthPeriod, ...(data.adjustmentsPct.monthPeriod || {}) },
+              jewishMode: { ...DEFAULT_ADJUSTMENTS.jewishMode, ...(data.adjustmentsPct.jewishMode || {}) },
+              arabMode: { ...DEFAULT_ADJUSTMENTS.arabMode, ...(data.adjustmentsPct.arabMode || {}) }
+            };
+          }
+        }
+        syncRuleChipButtons();
+        renderScheduleTable();
+        updateStatsAndList(currentTerminals);
       });
 
       unsubscribeCas = userRef.collection("settings").doc("cas_sync").onSnapshot((snap) => {
@@ -669,7 +934,7 @@
         } else if (data.lastSyncedAt) {
           const dt = new Date(Number(data.lastSyncedAt)).toLocaleString("he-IL");
           statusEl.textContent = `סונכרן לאחרונה מכספונט: ${dt} (${data.lastSyncCount ?? 0} מסופים)`;
-          pillEl.textContent = `סונכרן: ${dt}`;
+          pillEl.textContent = `סונכרן לאחרונה: ${dt}`;
         }
       });
 
@@ -721,23 +986,13 @@
 
     document.getElementById("logoutBtn").addEventListener("click", () => auth.signOut());
 
-    document.getElementById("toggleRouteBtn").addEventListener("click", () => {
-      document.getElementById("routePanel").classList.toggle("hidden");
+    document.getElementById("toggleScheduleBtn").addEventListener("click", () => {
+      renderScheduleTable();
+      document.getElementById("schedulePanel").classList.toggle("hidden");
     });
 
     document.getElementById("toggleCasBtn").addEventListener("click", () => {
       document.getElementById("casPanel").classList.toggle("hidden");
-    });
-
-    document.getElementById("saveRouteBtn").addEventListener("click", async () => {
-      if (!currentUser) return;
-      const days = [...document.querySelectorAll("#daysContainer input:checked")].map((el) => Number(el.value));
-      await db.collection("distributors").doc(currentUser.uid).collection("settings").doc("route").set({
-        days,
-        updatedAt: Date.now()
-      }, { merge: true });
-      document.getElementById("routeSavedMsg").textContent = "נשמר";
-      setTimeout(() => { document.getElementById("routeSavedMsg").textContent = ""; }, 2000);
     });
 
     document.getElementById("saveAndSyncCasBtn").addEventListener("click", async () => {
@@ -761,10 +1016,7 @@
         (acc, t) => acc + calcLoadAmountILS(t.balance, getEffectiveTargetK(t)),
         0
       );
-      const totalPacks5k = currentTerminals.reduce(
-        (acc, t) => acc + calcPacks5k(calcLoadAmountILS(t.balance, getEffectiveTargetK(t))),
-        0
-      );
+      const totalPacks5k = calcPacks5k(totalToLoad);
       const lines = [
         "*דוח מצב מסופים*",
         `סה"כ להטענה: ₪${formatAmountILS(totalToLoad)} | חבילות 5k מהבנק: ${totalPacks5k}`,
@@ -780,6 +1032,9 @@
       window.open(url, "_blank");
     });
 
+    renderScheduleTable();
+    syncRuleChipButtons();
+
     auth.onAuthStateChanged((user) => {
       currentUser = user;
       if (user) {
@@ -790,6 +1045,7 @@
       } else {
         if (unsubscribeTerminals) unsubscribeTerminals();
         if (unsubscribeCas) unsubscribeCas();
+        if (unsubscribeSchedule) unsubscribeSchedule();
         document.getElementById("appSection").classList.add("hidden");
         document.getElementById("authSection").classList.remove("hidden");
       }
