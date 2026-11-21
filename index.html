@@ -88,6 +88,28 @@
       border-radius: 999px;
     }
 
+    .trial-pill {
+      background: rgba(245, 158, 11, 0.22);
+      color: #fde68a;
+      border: 1px solid rgba(251, 191, 36, 0.45);
+      font-size: 0.78rem;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 999px;
+    }
+
+    .trial-pill.expired {
+      background: rgba(220, 38, 38, 0.28);
+      color: #fecaca;
+      border-color: rgba(248, 113, 113, 0.55);
+    }
+
+    .trial-pill.active-plan {
+      background: rgba(22, 163, 74, 0.24);
+      color: #bbf7d0;
+      border-color: rgba(74, 222, 128, 0.45);
+    }
+
     .auto-pill {
       background: rgba(22, 163, 74, 0.22);
       color: #bbf7d0;
@@ -400,6 +422,56 @@
       color: #fff;
     }
 
+    .btn-pay {
+      background: #f59e0b;
+      border-color: #d97706;
+      color: #111827;
+      font-weight: 800;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 50;
+    }
+
+    .modal-card {
+      width: 100%;
+      max-width: 460px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .plan-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .plan-option {
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      text-align: center;
+      cursor: pointer;
+      background: #f9fafb;
+    }
+
+    .plan-option.selected {
+      border-color: var(--primary);
+      background: var(--primary-soft);
+    }
+
     .auth-box {
       max-width: 420px;
       margin: 50px auto;
@@ -456,6 +528,7 @@
           <span>ניהול קו כספומטים</span>
         </div>
         <span class="auto-pill">מצב אוטומטי פעיל</span>
+        <span id="trialDaysPill" class="trial-pill">ניסיון: 14 ימים</span>
         <span id="lastSyncPill" class="sync-pill">ממתין לסנכרון...</span>
         <span id="userEmailBadge" class="sync-pill"></span>
       </div>
@@ -465,6 +538,7 @@
         <button id="refreshBtn" type="button">🔄 רענן</button>
         <button id="toggleRouteBtn" type="button">📅 ימי קו</button>
         <button id="toggleCasBtn" type="button">🏦 כספונט</button>
+        <button id="openPayModalBtn" type="button" class="btn-pay">💳 שדרוג / תשלום</button>
         <button id="whatsappBtn" type="button" class="btn-whatsapp">💬 שלח לוואטסאפ</button>
         <button id="logoutBtn" type="button">יציאה</button>
       </div>
@@ -552,6 +626,34 @@
     </main>
   </div>
 
+  <!-- חלון אופציה לתשלום / שדרוג מנוי -->
+  <div id="paymentModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="payModalTitle">
+    <div class="modal-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <strong id="payModalTitle" style="font-size:1.05rem;">💳 שדרוג / תשלום מנוי</strong>
+        <button id="closePayModalBtn" type="button">✕</button>
+      </div>
+      <div id="payTrialSummary" class="status-note"></div>
+
+      <div class="plan-grid">
+        <div class="plan-option selected" data-plan="monthly" data-price="₪99 / חודש">
+          <div style="font-weight:800;">חודשי</div>
+          <div style="font-size:1.1rem;font-weight:900;color:#1d4ed8;margin-top:4px;">₪99 / חודש</div>
+          <div class="status-note">גמיש ללא התחייבות</div>
+        </div>
+        <div class="plan-option" data-plan="yearly" data-price="₪890 / שנה">
+          <div style="font-weight:800;">שנתי (חודשיים מתנה)</div>
+          <div style="font-size:1.1rem;font-weight:900;color:#15803d;margin-top:4px;">₪890 / שנה</div>
+          <div class="status-note">חיסכון שנתי</div>
+        </div>
+      </div>
+
+      <input id="payerPhoneInput" type="tel" placeholder="טלפון ליצירת קשר / קבלה" />
+      <button id="confirmPaymentBtn" type="button" class="btn-primary">המשך לתשלום / שלח בקשת שדרוג</button>
+      <div id="paymentFeedback" class="status-note"></div>
+    </div>
+  </div>
+
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyBKQfbitijJHfIGAKg9N2aNvT6BCHEYsCU",
@@ -569,6 +671,7 @@
     const db = firebase.firestore();
 
     const DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+    const TRIAL_DAYS_DEFAULT = 14;
 
     const ADJUSTMENTS = {
       refillDay: { midweek: 0, thursday: 25 },
@@ -582,6 +685,8 @@
     let searchQuery = "";
     let unsubscribeTerminals = null;
     let unsubscribeCas = null;
+    let unsubscribeProfile = null;
+    let selectedPlan = { id: "monthly", label: "חודשי (₪99 / חודש)" };
 
     let activeRules = {
       refillDay: "midweek",
@@ -593,6 +698,35 @@
     function formatAmountILS(val) {
       const num = Number(val ?? 0);
       return Number.isFinite(num) ? num.toLocaleString("he-IL") : "0";
+    }
+
+    function updateTrialPill(profile = {}) {
+      const pill = document.getElementById("trialDaysPill");
+      const summary = document.getElementById("payTrialSummary");
+      const status = profile.subscriptionStatus || "trial";
+      const now = Date.now();
+
+      if (status === "active") {
+        pill.className = "trial-pill active-plan";
+        pill.textContent = "מנוי פעיל";
+        summary.textContent = "המנוי שלך פעיל.";
+        return;
+      }
+
+      const fallbackTrialEnd = (Number(profile.createdAt) || now) + TRIAL_DAYS_DEFAULT * 24 * 60 * 60 * 1000;
+      const trialEndMs = Number(profile.trialEndsAt) || fallbackTrialEnd;
+      const diffMs = trialEndMs - now;
+      const daysLeft = Math.max(0, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
+
+      if (daysLeft > 0) {
+        pill.className = "trial-pill";
+        pill.textContent = `ניסיון: ${daysLeft} ${daysLeft === 1 ? "יום נותר" : "ימים נותרו"}`;
+        summary.textContent = `נותרו לך ${daysLeft} ימים לתקופת הניסיון. ניתן לשדרג למנוי מלא בכל עת.`;
+      } else {
+        pill.className = "trial-pill expired";
+        pill.textContent = "ניסיון: 0 ימים (הסתיים)";
+        summary.textContent = "תקופת הניסיון הסתיימה. בחר מסלול כדי להמשיך להשתמש במערכת.";
+      }
     }
 
     function getTerminalThreshold(t) {
@@ -862,8 +996,14 @@
     function bindUserListeners(uid) {
       if (unsubscribeTerminals) unsubscribeTerminals();
       if (unsubscribeCas) unsubscribeCas();
+      if (unsubscribeProfile) unsubscribeProfile();
 
       const userRef = db.collection("distributors").doc(uid);
+
+      unsubscribeProfile = userRef.onSnapshot((snap) => {
+        const data = snap.exists ? (snap.data() || {}) : {};
+        updateTrialPill(data);
+      });
 
       userRef.collection("settings").doc("route").get().then((snap) => {
         const days = snap.exists && Array.isArray(snap.data().days) ? snap.data().days : [0, 2, 4];
@@ -902,6 +1042,41 @@
         updateStatsAndList(currentTerminals);
       });
     }
+
+    document.getElementById("openPayModalBtn").addEventListener("click", () => {
+      document.getElementById("paymentFeedback").textContent = "";
+      document.getElementById("paymentModal").classList.remove("hidden");
+    });
+
+    document.getElementById("closePayModalBtn").addEventListener("click", () => {
+      document.getElementById("paymentModal").classList.add("hidden");
+    });
+
+    document.querySelectorAll(".plan-option").forEach((el) => {
+      el.addEventListener("click", () => {
+        document.querySelectorAll(".plan-option").forEach((o) => o.classList.remove("selected"));
+        el.classList.add("selected");
+        selectedPlan = {
+          id: el.getAttribute("data-plan"),
+          label: `${el.children[0].textContent} (${el.getAttribute("data-price")})`
+        };
+      });
+    });
+
+    document.getElementById("confirmPaymentBtn").addEventListener("click", async () => {
+      if (!currentUser) return;
+      const phone = document.getElementById("payerPhoneInput").value.trim();
+      const feedback = document.getElementById("paymentFeedback");
+      await db.collection("distributors").doc(currentUser.uid).set({
+        upgradeRequest: {
+          planId: selectedPlan.id,
+          planLabel: selectedPlan.label,
+          phone,
+          requestedAt: Date.now()
+        }
+      }, { merge: true });
+      feedback.textContent = `בקשת התשלום עבור מסלול ${selectedPlan.label} נרשמה.`;
+    });
 
     document.getElementById("searchInput").addEventListener("input", (e) => {
       searchQuery = e.target.value || "";
@@ -946,7 +1121,7 @@
         await db.collection("distributors").doc(cred.user.uid).set({
           email,
           subscriptionStatus: "trial",
-          trialEndsAt: now + 14 * 24 * 60 * 60 * 1000,
+          trialEndsAt: now + TRIAL_DAYS_DEFAULT * 24 * 60 * 60 * 1000,
           createdAt: now
         }, { merge: true });
       } catch (err) {
@@ -1038,6 +1213,7 @@
       } else {
         if (unsubscribeTerminals) unsubscribeTerminals();
         if (unsubscribeCas) unsubscribeCas();
+        if (unsubscribeProfile) unsubscribeProfile();
         document.getElementById("appSection").classList.add("hidden");
         document.getElementById("authSection").classList.remove("hidden");
       }
