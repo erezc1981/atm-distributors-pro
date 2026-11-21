@@ -226,34 +226,6 @@
       font-size: 0.9rem;
     }
 
-    .schedule-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 10px;
-      font-size: 0.88rem;
-    }
-
-    .schedule-table th,
-    .schedule-table td {
-      border: 1px solid var(--border);
-      padding: 8px 10px;
-      text-align: center;
-    }
-
-    .schedule-table th {
-      background: #f8fafc;
-      font-weight: 700;
-    }
-
-    .schedule-table input[type="number"] {
-      width: 95px;
-      padding: 5px 8px;
-      border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      text-align: center;
-      font-family: inherit;
-    }
-
     .terminal-card {
       display: flex;
       flex-wrap: wrap;
@@ -469,7 +441,6 @@
 
   <!-- מסך ניהול ראשי -->
   <div id="appSection" class="hidden">
-    <!-- פיצר התראה למסופים נמוכים (מופיע רק כשיש התראה) -->
     <div id="alertBanner" class="alert-banner hidden"></div>
 
     <header class="topbar">
@@ -487,7 +458,6 @@
         <input id="searchInput" type="search" placeholder="חיפוש מסוף / מספר..." style="width:165px;padding:6px 10px;color:#111827;" />
         <button id="refreshBtn" type="button">🔄 רענן</button>
         <button id="toggleRouteBtn" type="button">📅 ימי קו</button>
-        <button id="toggleScheduleBtn" type="button">📊 טבלת טעינה וחגים</button>
         <button id="toggleCasBtn" type="button">🏦 כספונט</button>
         <button id="whatsappBtn" type="button" class="btn-whatsapp">💬 שלח לוואטסאפ</button>
         <button id="logoutBtn" type="button">יציאה</button>
@@ -501,25 +471,6 @@
         <div id="daysContainer" class="days-row"></div>
         <button id="saveRouteBtn" type="button" class="btn-primary">שמור ימי קו</button>
         <span id="routeSavedMsg" class="status-note"></span>
-      </section>
-
-      <!-- טבלת ימי הטענה וחגים -->
-      <section id="schedulePanel" class="panel hidden">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-          <strong>טבלת ימי הטענה, תקופות וחגים (אחוז התאמה ליעד מילוי)</strong>
-          <button id="saveScheduleTableBtn" type="button" class="btn-primary">שמור טבלה</button>
-        </div>
-        <table class="schedule-table">
-          <thead>
-            <tr>
-              <th>קטגוריה</th>
-              <th>מצב / תקופה</th>
-              <th>התאמה (%)</th>
-            </tr>
-          </thead>
-          <tbody id="scheduleTableBody"></tbody>
-        </table>
-        <div id="scheduleSavedMsg" class="status-note" style="margin-top:8px;"></div>
       </section>
 
       <!-- הגדרות וסנכרון כספונט -->
@@ -613,33 +564,18 @@
 
     const DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
-    const DEFAULT_ADJUSTMENTS = {
+    const ADJUSTMENTS = {
       refillDay: { midweek: 0, thursday: 25 },
       monthPeriod: { regular: 0, salaries: 15, allowances: 15 },
       jewishMode: { regular: 0, eve_holiday: 35, holiday: -75 },
       arabMode: { regular: 0, eve_eid: 35, ramadan: 15 }
     };
 
-    const SCHEDULE_ROWS = [
-      { group: "refillDay", key: "midweek", category: "יום הטענה", label: 'ראשון / שלישי (יומיים)' },
-      { group: "refillDay", key: "thursday", category: "יום הטענה", label: 'חמישי (סופ"ש)' },
-      { group: "monthPeriod", key: "regular", category: "תקופה בחודש", label: "רגיל" },
-      { group: "monthPeriod", key: "salaries", category: "תקופה בחודש", label: "משכורות (8–12)" },
-      { group: "monthPeriod", key: "allowances", category: "תקופה בחודש", label: "קצבאות (26–29)" },
-      { group: "jewishMode", key: "regular", category: "מגזר יהודי", label: "רגיל" },
-      { group: "jewishMode", key: "eve_holiday", category: "מגזר יהודי", label: "ערב חג" },
-      { group: "jewishMode", key: "holiday", category: "מגזר יהודי", label: "חג" },
-      { group: "arabMode", key: "regular", category: "מגזר ערבי", label: "רגיל" },
-      { group: "arabMode", key: "eve_eid", category: "מגזר ערבי", label: "ערב חג / עיד" },
-      { group: "arabMode", key: "ramadan", category: "מגזר ערבי", label: "רמדאן" }
-    ];
-
     let currentUser = null;
     let currentTerminals = [];
     let searchQuery = "";
     let unsubscribeTerminals = null;
     let unsubscribeCas = null;
-    let unsubscribeSchedule = null;
 
     let activeRules = {
       refillDay: "midweek",
@@ -647,8 +583,6 @@
       jewishMode: "regular",
       arabMode: "regular"
     };
-
-    let adjustmentsPct = JSON.parse(JSON.stringify(DEFAULT_ADJUSTMENTS));
 
     function formatAmountILS(val) {
       const num = Number(val ?? 0);
@@ -666,18 +600,17 @@
 
     function getEffectiveTargetK(t) {
       const baseK = Number(t.baseTargetK ?? 15);
-      const dayPct = Number(adjustmentsPct.refillDay?.[activeRules.refillDay] ?? 0);
-      const periodPct = Number(adjustmentsPct.monthPeriod?.[activeRules.monthPeriod] ?? 0);
+      const dayPct = Number(ADJUSTMENTS.refillDay?.[activeRules.refillDay] ?? 0);
+      const periodPct = Number(ADJUSTMENTS.monthPeriod?.[activeRules.monthPeriod] ?? 0);
       const sector = getTerminalSector(t);
       const sectorPct = sector === "arab"
-        ? Number(adjustmentsPct.arabMode?.[activeRules.arabMode] ?? 0)
-        : Number(adjustmentsPct.jewishMode?.[activeRules.jewishMode] ?? 0);
+        ? Number(ADJUSTMENTS.arabMode?.[activeRules.arabMode] ?? 0)
+        : Number(ADJUSTMENTS.jewishMode?.[activeRules.jewishMode] ?? 0);
 
       const totalFactor = (1 + dayPct / 100) * (1 + periodPct / 100) * (1 + sectorPct / 100);
       return Math.max(0, Math.round(baseK * totalFactor));
     }
 
-    // עיגול סכום ההטענה לכפולות של 5,000 ₪ (למשל 10,300 -> 10,000 או 15,000 לפי nearest 5k)
     function calcLoadAmountILS(balance, targetK) {
       const targetAmount = Number(targetK ?? 15) * 1000;
       const currentBal = Number(balance ?? 0);
@@ -697,28 +630,6 @@
       wrap.innerHTML = DAYS.map((day, idx) => {
         const checked = selectedDays.includes(idx) ? "checked" : "";
         return `<label class="day-chip"><input type="checkbox" value="${idx}" ${checked} /> ${day}</label>`;
-      }).join("");
-    }
-
-    function renderScheduleTable() {
-      const tbody = document.getElementById("scheduleTableBody");
-      tbody.innerHTML = SCHEDULE_ROWS.map((r) => {
-        const val = adjustmentsPct[r.group]?.[r.key] ?? 0;
-        return `
-          <tr>
-            <td>${r.category}</td>
-            <td>${r.label}</td>
-            <td>
-              <input
-                type="number"
-                step="5"
-                data-adj-group="${r.group}"
-                data-adj-key="${r.key}"
-                value="${val}"
-              />
-            </td>
-          </tr>
-        `;
       }).join("");
     }
 
@@ -814,7 +725,7 @@
 
       const listEl = document.getElementById("terminalsList");
       if (!filtered.length) {
-        listEl.innerHTML = `<div class="panel status-note">אין מסופים להצגה. לחץ על "כספונט" כדי לבקש סנכרון לחשבון זה.</div>`;
+        listEl.innerHTML = `<div class="panel status-note">אין מסופים להצגה. לחץ על "כספונט" או "רענן" כדי לסנכרן מול כספונט.</div>`;
       } else {
         listEl.innerHTML = filtered.map((t, idx) => renderTerminalCard(t, idx)).join("");
       }
@@ -888,47 +799,18 @@
     };
 
     document.querySelectorAll(".chip-btn").forEach((btn) => {
-      btn.addEventListener("click", async () => {
+      btn.addEventListener("click", () => {
         const grp = btn.getAttribute("data-rule-group");
         const val = btn.getAttribute("data-rule-val");
         activeRules[grp] = val;
         syncRuleChipButtons();
         updateStatsAndList(currentTerminals);
-        if (currentUser) {
-          await db
-            .collection("distributors")
-            .doc(currentUser.uid)
-            .collection("settings")
-            .doc("schedule_rules")
-            .set({ activeRules, updatedAt: Date.now() }, { merge: true });
-        }
       });
     });
 
-    document.getElementById("saveScheduleTableBtn").addEventListener("click", async () => {
-      if (!currentUser) return;
-      document.querySelectorAll("#scheduleTableBody input[data-adj-group]").forEach((inp) => {
-        const grp = inp.getAttribute("data-adj-group");
-        const k = inp.getAttribute("data-adj-key");
-        const num = Number(inp.value);
-        if (!adjustmentsPct[grp]) adjustmentsPct[grp] = {};
-        adjustmentsPct[grp][k] = Number.isFinite(num) ? num : 0;
-      });
-      await db
-        .collection("distributors")
-        .doc(currentUser.uid)
-        .collection("settings")
-        .doc("schedule_rules")
-        .set({ adjustmentsPct, activeRules, updatedAt: Date.now() }, { merge: true });
-      updateStatsAndList(currentTerminals);
-      const msgEl = document.getElementById("scheduleSavedMsg");
-      msgEl.textContent = "טבלת ימי הטענה והחגים נשמרה.";
-      setTimeout(() => { msgEl.textContent = ""; }, 2500);
-    });
-
-    async function requestFreshSyncOnLogin(uid) {
+    async function triggerCasSync(uid, force = false) {
       const sessionKey = `atm_pro_login_sync_${uid}`;
-      if (sessionStorage.getItem(sessionKey)) return;
+      if (!force && sessionStorage.getItem(sessionKey)) return;
       sessionStorage.setItem(sessionKey, "1");
 
       const casDocRef = db.collection("distributors").doc(uid).collection("settings").doc("cas_sync");
@@ -938,7 +820,7 @@
       if (data.username && data.password) {
         await casDocRef.set({
           syncRequested: true,
-          loginSyncRequestedAt: Date.now()
+          syncRequestedAt: Date.now()
         }, { merge: true });
       }
     }
@@ -946,33 +828,12 @@
     function bindUserListeners(uid) {
       if (unsubscribeTerminals) unsubscribeTerminals();
       if (unsubscribeCas) unsubscribeCas();
-      if (unsubscribeSchedule) unsubscribeSchedule();
 
       const userRef = db.collection("distributors").doc(uid);
 
       userRef.collection("settings").doc("route").get().then((snap) => {
         const days = snap.exists && Array.isArray(snap.data().days) ? snap.data().days : [0, 2, 4];
         renderDaysSelector(days);
-      });
-
-      unsubscribeSchedule = userRef.collection("settings").doc("schedule_rules").onSnapshot((snap) => {
-        if (snap.exists) {
-          const data = snap.data() || {};
-          if (data.activeRules) {
-            activeRules = { ...activeRules, ...data.activeRules };
-          }
-          if (data.adjustmentsPct) {
-            adjustmentsPct = {
-              refillDay: { ...DEFAULT_ADJUSTMENTS.refillDay, ...(data.adjustmentsPct.refillDay || {}) },
-              monthPeriod: { ...DEFAULT_ADJUSTMENTS.monthPeriod, ...(data.monthPeriod || {}) },
-              jewishMode: { ...DEFAULT_ADJUSTMENTS.jewishMode, ...(data.jewishMode || {}) },
-              arabMode: { ...DEFAULT_ADJUSTMENTS.arabMode, ...(data.arabMode || {}) }
-            };
-          }
-        }
-        syncRuleChipButtons();
-        renderScheduleTable();
-        updateStatsAndList(currentTerminals);
       });
 
       unsubscribeCas = userRef.collection("settings").doc("cas_sync").onSnapshot((snap) => {
@@ -1013,8 +874,21 @@
       updateStatsAndList(currentTerminals);
     });
 
-    document.getElementById("refreshBtn").addEventListener("click", () => {
-      if (currentUser) bindUserListeners(currentUser.uid);
+    document.getElementById("refreshBtn").addEventListener("click", async () => {
+      const btn = document.getElementById("refreshBtn");
+      btn.disabled = true;
+      btn.textContent = "⏳ מרענן...";
+      try {
+        if (currentUser) {
+          bindUserListeners(currentUser.uid);
+          await triggerCasSync(currentUser.uid, true);
+        }
+      } finally {
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.textContent = "🔄 רענן";
+        }, 800);
+      }
     });
 
     document.getElementById("loginBtn").addEventListener("click", async () => {
@@ -1055,11 +929,6 @@
 
     document.getElementById("toggleRouteBtn").addEventListener("click", () => {
       document.getElementById("routePanel").classList.toggle("hidden");
-    });
-
-    document.getElementById("toggleScheduleBtn").addEventListener("click", () => {
-      renderScheduleTable();
-      document.getElementById("schedulePanel").classList.toggle("hidden");
     });
 
     document.getElementById("toggleCasBtn").addEventListener("click", () => {
@@ -1115,7 +984,6 @@
     });
 
     renderDaysSelector([0, 2, 4]);
-    renderScheduleTable();
     syncRuleChipButtons();
 
     auth.onAuthStateChanged(async (user) => {
@@ -1126,14 +994,13 @@
         document.getElementById("userEmailBadge").textContent = user.email || "";
         bindUserListeners(user.uid);
         try {
-          await requestFreshSyncOnLogin(user.uid);
+          await triggerCasSync(user.uid, false);
         } catch (err) {
           console.error("Failed to trigger login sync:", err);
         }
       } else {
         if (unsubscribeTerminals) unsubscribeTerminals();
         if (unsubscribeCas) unsubscribeCas();
-        if (unsubscribeSchedule) unsubscribeSchedule();
         document.getElementById("appSection").classList.add("hidden");
         document.getElementById("authSection").classList.remove("hidden");
       }
