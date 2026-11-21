@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ATM Pro — ניהול קו כספומטים למפיצים</title>
+  <title>ATM — ניהול קו כספומטים</title>
   <link rel="manifest" href="manifest.json" />
   <style>
     :root {
@@ -11,6 +11,7 @@
       --card: #ffffff;
       --alert-bg: #fff5f5;
       --alert-border: #f2d6d6;
+      --alert-banner: #dc2626;
       --text: #111827;
       --muted: #6b7280;
       --primary: #1d4ed8;
@@ -31,9 +32,18 @@
       direction: rtl;
     }
 
+    .alert-banner {
+      background: var(--alert-banner);
+      color: #fff;
+      text-align: center;
+      padding: 8px 16px;
+      font-weight: 700;
+      font-size: 0.92rem;
+    }
+
     .topbar {
-      background: var(--card);
-      border-bottom: 1px solid var(--border);
+      background: #1e293b;
+      color: #fff;
       padding: 12px 20px;
       display: flex;
       flex-wrap: wrap;
@@ -45,19 +55,36 @@
       z-index: 10;
     }
 
-    .brand {
+    .brand-group {
       display: flex;
       align-items: center;
       gap: 10px;
-      font-weight: 800;
-      font-size: 1.1rem;
+      flex-wrap: wrap;
     }
 
-    .badge-pro {
-      background: var(--primary);
+    .brand-title {
+      font-weight: 800;
+      font-size: 1.15rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .atm-tag {
+      background: #2563eb;
       color: #fff;
-      font-size: 0.75rem;
-      padding: 2px 8px;
+      font-size: 0.72rem;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 6px;
+      letter-spacing: 0.5px;
+    }
+
+    .sync-pill {
+      background: rgba(255, 255, 255, 0.12);
+      color: #e2e8f0;
+      font-size: 0.78rem;
+      padding: 3px 10px;
       border-radius: 999px;
     }
 
@@ -69,7 +96,7 @@
     }
 
     .container {
-      max-width: 1050px;
+      max-width: 1080px;
       margin: 20px auto;
       padding: 0 16px 40px;
     }
@@ -82,22 +109,52 @@
       margin-bottom: 16px;
     }
 
-    .stats-grid {
+    .stats-top {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 12px;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
+    }
+
+    .stats-sub {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .stat-hero {
+      background: #dbeafe;
+      border: 1px solid #bfdbfe;
+      border-radius: 12px;
+      padding: 18px 16px;
+      text-align: center;
+    }
+
+    .stat-hero-val {
+      font-size: 1.7rem;
+      font-weight: 900;
+      color: #0f172a;
+    }
+
+    .stat-hero-lbl {
+      font-size: 0.88rem;
+      color: #334155;
+      margin-top: 4px;
+      font-weight: 600;
     }
 
     .stat-box {
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 14px;
+      padding: 14px 16px;
+      text-align: center;
     }
 
     .stat-label { font-size: 0.82rem; color: var(--muted); }
     .stat-value { font-size: 1.35rem; font-weight: 800; margin-top: 4px; }
+    .stat-sub { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
 
     .terminal-card {
       display: flex;
@@ -140,7 +197,7 @@
     .terminal-header {
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 3px;
     }
 
     .terminal-title {
@@ -149,12 +206,33 @@
     }
 
     .terminal-meta {
-      font-size: 0.86rem;
+      font-size: 0.85rem;
       color: var(--muted);
+    }
+
+    .terminal-left {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: 6px;
+      gap: 16px;
+    }
+
+    .metric-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 82px;
+    }
+
+    .metric-label {
+      font-size: 0.74rem;
+      color: var(--muted);
+    }
+
+    .metric-val {
+      font-weight: 800;
+      font-size: 1rem;
+      color: var(--text);
     }
 
     .target-inline {
@@ -177,33 +255,8 @@
       background: rgba(0, 0, 0, 0.08);
     }
 
-    .terminal-left {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 14px;
-    }
-
-    .metric-col {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      min-width: 82px;
-    }
-
-    .metric-label {
-      font-size: 0.74rem;
-      color: var(--muted);
-    }
-
-    .metric-val {
-      font-weight: 800;
-      font-size: 1rem;
-      color: var(--text);
-    }
-
     .fill-display {
-      padding: 6px 12px;
+      padding: 6px 14px;
       border-radius: 8px;
       font-weight: 700;
       font-size: 0.9rem;
@@ -211,6 +264,7 @@
       border: 1px solid #93c5fd;
       color: var(--primary);
       white-space: nowrap;
+      user-select: none;
     }
 
     .fill-display.ok-badge {
@@ -293,9 +347,9 @@
 <body>
   <!-- מסך התחברות / הרשמה -->
   <div id="authSection" class="auth-box">
-    <div class="brand">
-      <span>ATM Pro</span>
-      <span class="badge-pro">מפיצים</span>
+    <div class="brand-title">
+      <span class="atm-tag">ATM</span>
+      <span>ניהול קו כספומטים</span>
     </div>
     <p class="status-note" style="margin:0">התחבר לחשבון המפיץ או הירשם ל-14 ימי ניסיון.</p>
     <input id="emailInput" type="email" placeholder="אימייל" autocomplete="email" />
@@ -307,13 +361,21 @@
 
   <!-- מסך ניהול ראשי -->
   <div id="appSection" class="hidden">
+    <div id="alertBanner" class="alert-banner hidden"></div>
+
     <header class="topbar">
-      <div class="brand">
-        <span>ATM Pro — ניהול קו כספומטים</span>
-        <span id="userEmailBadge" class="status-note"></span>
+      <div class="brand-group">
+        <div class="brand-title">
+          <span class="atm-tag">ATM</span>
+          <span>ניהול קו כספומטים</span>
+        </div>
+        <span id="lastSyncPill" class="sync-pill">ממתין לסנכרון...</span>
+        <span id="userEmailBadge" class="sync-pill"></span>
       </div>
+
       <div class="toolbar">
-        <input id="searchInput" type="search" placeholder="חיפוש מסוף / מספר..." style="width:185px;padding:6px 10px;" />
+        <input id="searchInput" type="search" placeholder="חיפוש מסוף / מספר..." style="width:175px;padding:6px 10px;color:#111827;" />
+        <button id="refreshBtn" type="button">🔄 רענן</button>
         <button id="toggleRouteBtn" type="button">📅 ימי קו</button>
         <button id="toggleCasBtn" type="button">🏦 כספונט</button>
         <button id="whatsappBtn" type="button" class="btn-whatsapp">💬 שלח לוואטסאפ</button>
@@ -341,27 +403,34 @@
         <div id="casSyncStatus" class="status-note" style="margin-top:8px;"></div>
       </section>
 
-      <!-- סיכום נתונים -->
-      <section class="stats-grid">
-        <div class="stat-box">
-          <div class="stat-label">מסופים פעילים</div>
-          <div id="statCount" class="stat-value">0</div>
+      <!-- סיכום ראשי -->
+      <section class="stats-top">
+        <div class="stat-hero">
+          <div id="statCount" class="stat-hero-val">0</div>
+          <div class="stat-hero-lbl">מסופים פעילים</div>
         </div>
-        <div class="stat-box">
-          <div class="stat-label">במחסנית</div>
-          <div id="statBalance" class="stat-value">₪0</div>
+        <div class="stat-hero">
+          <div id="statBalance" class="stat-hero-val">₪0</div>
+          <div class="stat-hero-lbl">במחסנית</div>
         </div>
+      </section>
+
+      <!-- סיכום משנה -->
+      <section class="stats-sub">
         <div class="stat-box">
           <div class="stat-label">נותר להטעין במסלול</div>
-          <div id="statToLoad" class="stat-value">₪0</div>
+          <div id="statToLoad" class="stat-value" style="color:#1d4ed8;">₪0</div>
+          <div id="statStationsToFill" class="stat-sub">0 תחנות למילוי</div>
         </div>
         <div class="stat-box">
           <div class="stat-label">חבילות 5k מהבנק</div>
-          <div id="statPacks5k" class="stat-value">0</div>
+          <div id="statPacks5k" class="stat-value" style="color:#15803d;">0</div>
+          <div class="stat-sub">למשיכה יומית מהבנק</div>
         </div>
         <div class="stat-box">
           <div class="stat-label">התראות יתרה נמוכה</div>
-          <div id="statAlerts" class="stat-value">0</div>
+          <div id="statAlerts" class="stat-value" style="color:#dc2626;">0</div>
+          <div class="stat-sub">מתחת לסף מינימום</div>
         </div>
       </section>
 
@@ -443,11 +512,10 @@
       const rawBalance = Number(t.balance ?? 0);
       const balanceFormatted = formatAmountILS(rawBalance);
       const loadAmount = calcLoadAmountILS(rawBalance, targetK);
-      const packs5k = calcPacks5k(loadAmount);
       const isAlert = rawBalance <= thresholdNum;
 
-      const fillLabelHtml = loadAmount > 0
-        ? `<span class="fill-display">למלא ₪${formatAmountILS(loadAmount)} (${packs5k}×5k)</span>`
+      const fillDisplayHtml = loadAmount > 0
+        ? `<span class="fill-display">למלא ₪${formatAmountILS(loadAmount)}</span>`
         : `<span class="fill-display ok-badge">תקין (0)</span>`;
 
       return `
@@ -456,11 +524,7 @@
             <span class="row-index">${index + 1}</span>
             <div class="terminal-header">
               <div class="terminal-title">${name}</div>
-              <div class="terminal-meta">
-                <span>מזהה: ${id}</span>
-                <span>•</span>
-                <span>סף התראה: ₪${threshold}</span>
-              </div>
+              <div class="terminal-meta">מזהה: ${id} • סף התראה: ₪${threshold}</div>
             </div>
           </div>
 
@@ -484,7 +548,7 @@
               </span>
             </div>
 
-            ${fillLabelHtml}
+            ${fillDisplayHtml}
 
             <button
               type="button"
@@ -513,23 +577,27 @@
       }
 
       const totalBalance = filtered.reduce((acc, t) => acc + Number(t.balance ?? 0), 0);
-      const totalToLoad = filtered.reduce(
-        (acc, t) => acc + calcLoadAmountILS(t.balance, getEffectiveTargetK(t)),
-        0
-      );
-      const totalPacks5k = filtered.reduce(
-        (acc, t) => acc + calcPacks5k(calcLoadAmountILS(t.balance, getEffectiveTargetK(t))),
-        0
-      );
-      const alertsCount = filtered.filter(
-        (t) => Number(t.balance ?? 0) <= getTerminalThreshold(t)
-      ).length;
+      const loads = filtered.map((t) => calcLoadAmountILS(t.balance, getEffectiveTargetK(t)));
+      const totalToLoad = loads.reduce((acc, v) => acc + v, 0);
+      const stationsToFill = loads.filter((v) => v > 0).length;
+      const totalPacks5k = loads.reduce((acc, v) => acc + calcPacks5k(v), 0);
+      const alertTerminals = filtered.filter((t) => Number(t.balance ?? 0) <= getTerminalThreshold(t));
+
+      const bannerEl = document.getElementById("alertBanner");
+      if (alertTerminals.length > 0) {
+        const previewNames = alertTerminals.slice(0, 3).map((t) => `${t.name} (₪${formatAmountILS(t.balance)})`).join(", ");
+        bannerEl.textContent = `🚨 התראת יתרה נמוכה ב-${alertTerminals.length} מסופים: ${previewNames}`;
+        bannerEl.classList.remove("hidden");
+      } else {
+        bannerEl.classList.add("hidden");
+      }
 
       document.getElementById("statCount").textContent = String(filtered.length);
       document.getElementById("statBalance").textContent = `₪${formatAmountILS(totalBalance)}`;
       document.getElementById("statToLoad").textContent = `₪${formatAmountILS(totalToLoad)}`;
+      document.getElementById("statStationsToFill").textContent = `${stationsToFill} תחנות למילוי`;
       document.getElementById("statPacks5k").textContent = String(totalPacks5k);
-      document.getElementById("statAlerts").textContent = String(alertsCount);
+      document.getElementById("statAlerts").textContent = String(alertTerminals.length);
     }
 
     window.openEditTargetModal = async function (terminalId) {
@@ -582,8 +650,10 @@
 
       unsubscribeCas = userRef.collection("settings").doc("cas_sync").onSnapshot((snap) => {
         const statusEl = document.getElementById("casSyncStatus");
+        const pillEl = document.getElementById("lastSyncPill");
         if (!snap.exists) {
           statusEl.textContent = "טרם הוגדרו פרטי כספונט.";
+          pillEl.textContent = "לא סונכרן";
           return;
         }
         const data = snap.data() || {};
@@ -592,18 +662,21 @@
         }
         if (data.syncRequested) {
           statusEl.textContent = "בקשת סנכרון מכספונט פעילה — ממתין לסקריפט הסנכרון...";
+          pillEl.textContent = "מסנכרן...";
         } else if (data.lastSyncError) {
           statusEl.textContent = `שגיאת סנכרון: ${data.lastSyncError}`;
+          pillEl.textContent = "שגיאת סנכרון";
         } else if (data.lastSyncedAt) {
           const dt = new Date(Number(data.lastSyncedAt)).toLocaleString("he-IL");
           statusEl.textContent = `סונכרן לאחרונה מכספונט: ${dt} (${data.lastSyncCount ?? 0} מסופים)`;
+          pillEl.textContent = `סונכרן: ${dt}`;
         }
       });
 
       unsubscribeTerminals = userRef.collection("terminals").onSnapshot((snap) => {
         currentTerminals = snap.docs
           .map((d) => ({ id: d.id, ...d.data() }))
-          .sort((a, b) => Number(a.order ?? 999) - Number(b.order ?? 999));
+          .sort((a, b) => Number(a.order ?? 9999) - Number(b.order ?? 9999));
         updateStatsAndList(currentTerminals);
       });
     }
@@ -611,6 +684,10 @@
     document.getElementById("searchInput").addEventListener("input", (e) => {
       searchQuery = e.target.value || "";
       updateStatsAndList(currentTerminals);
+    });
+
+    document.getElementById("refreshBtn").addEventListener("click", () => {
+      if (currentUser) bindUserListeners(currentUser.uid);
     });
 
     document.getElementById("loginBtn").addEventListener("click", async () => {
@@ -680,12 +757,24 @@
     });
 
     document.getElementById("whatsappBtn").addEventListener("click", () => {
-      const lines = ["*דוח מצב מסופים — ATM Pro*"];
+      const totalToLoad = currentTerminals.reduce(
+        (acc, t) => acc + calcLoadAmountILS(t.balance, getEffectiveTargetK(t)),
+        0
+      );
+      const totalPacks5k = currentTerminals.reduce(
+        (acc, t) => acc + calcPacks5k(calcLoadAmountILS(t.balance, getEffectiveTargetK(t))),
+        0
+      );
+      const lines = [
+        "*דוח מצב מסופים*",
+        `סה"כ להטענה: ₪${formatAmountILS(totalToLoad)} | חבילות 5k מהבנק: ${totalPacks5k}`,
+        ""
+      ];
       currentTerminals.forEach((t, idx) => {
         const targetK = getEffectiveTargetK(t);
         const loadAmt = calcLoadAmountILS(t.balance, targetK);
-        const packs = calcPacks5k(loadAmt);
-        lines.push(`${idx + 1}. ${t.name} (${t.id}): מחסנית ₪${formatAmountILS(t.balance)} | יעד ${targetK}k | למלא ₪${formatAmountILS(loadAmt)} (${packs}×5k)`);
+        const statusText = loadAmt > 0 ? `למלא ₪${formatAmountILS(loadAmt)}` : "תקין (0)";
+        lines.push(`${idx + 1}. ${t.name} (${t.id}): במחסנית ₪${formatAmountILS(t.balance)} | יעד ${targetK}k | ${statusText}`);
       });
       const url = `https://wa.me/?text=${encodeURIComponent(lines.join("\n"))}`;
       window.open(url, "_blank");
