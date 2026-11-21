@@ -886,6 +886,23 @@
       setTimeout(() => { msgEl.textContent = ""; }, 2500);
     });
 
+    async function requestFreshSyncOnLogin(uid) {
+      const sessionKey = `atm_pro_login_sync_${uid}`;
+      if (sessionStorage.getItem(sessionKey)) return;
+      sessionStorage.setItem(sessionKey, "1");
+
+      const casDocRef = db.collection("distributors").doc(uid).collection("settings").doc("cas_sync");
+      const snap = await casDocRef.get();
+      if (!snap.exists) return;
+      const data = snap.data() || {};
+      if (data.username && data.password) {
+        await casDocRef.set({
+          syncRequested: true,
+          loginSyncRequestedAt: Date.now()
+        }, { merge: true });
+      }
+    }
+
     function bindUserListeners(uid) {
       if (unsubscribeTerminals) unsubscribeTerminals();
       if (unsubscribeCas) unsubscribeCas();
@@ -902,9 +919,9 @@
           if (data.adjustmentsPct) {
             adjustmentsPct = {
               refillDay: { ...DEFAULT_ADJUSTMENTS.refillDay, ...(data.adjustmentsPct.refillDay || {}) },
-              monthPeriod: { ...DEFAULT_ADJUSTMENTS.monthPeriod, ...(data.adjustmentsPct.monthPeriod || {}) },
-              jewishMode: { ...DEFAULT_ADJUSTMENTS.jewishMode, ...(data.adjustmentsPct.jewishMode || {}) },
-              arabMode: { ...DEFAULT_ADJUSTMENTS.arabMode, ...(data.adjustmentsPct.arabMode || {}) }
+              monthPeriod: { ...DEFAULT_ADJUSTMENTS.monthPeriod, ...(data.monthPeriod || {}) },
+              jewishMode: { ...DEFAULT_ADJUSTMENTS.jewishMode, ...(data.jewishMode || {}) },
+              arabMode: { ...DEFAULT_ADJUSTMENTS.arabMode, ...(data.arabMode || {}) }
             };
           }
         }
@@ -984,7 +1001,12 @@
       }
     });
 
-    document.getElementById("logoutBtn").addEventListener("click", () => auth.signOut());
+    document.getElementById("logoutBtn").addEventListener("click", () => {
+      if (currentUser) {
+        sessionStorage.removeItem(`atm_pro_login_sync_${currentUser.uid}`);
+      }
+      auth.signOut();
+    });
 
     document.getElementById("toggleScheduleBtn").addEventListener("click", () => {
       renderScheduleTable();
@@ -1035,13 +1057,18 @@
     renderScheduleTable();
     syncRuleChipButtons();
 
-    auth.onAuthStateChanged((user) => {
+    auth.onAuthStateChanged(async (user) => {
       currentUser = user;
       if (user) {
         document.getElementById("authSection").classList.add("hidden");
         document.getElementById("appSection").classList.remove("hidden");
         document.getElementById("userEmailBadge").textContent = user.email || "";
         bindUserListeners(user.uid);
+        try {
+          await requestFreshSyncOnLogin(user.uid);
+        } catch (err) {
+          console.error("Failed to trigger login sync:", err);
+        }
       } else {
         if (unsubscribeTerminals) unsubscribeTerminals();
         if (unsubscribeCas) unsubscribeCas();
