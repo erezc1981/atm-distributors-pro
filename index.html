@@ -171,12 +171,16 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      min-width: 115px;
+      min-width: 125px;
       padding: 5px 12px;
       border-radius: 8px;
       background: #ffffff;
       border: 1px solid #d1d5db;
-      user-select: all;
+      cursor: pointer;
+    }
+
+    .cassette-box:hover {
+      border-color: var(--primary);
     }
 
     .cassette-label {
@@ -290,7 +294,7 @@
         <span id="userEmailBadge" class="status-note"></span>
       </div>
       <div class="toolbar">
-        <input id="searchInput" type="search" placeholder="חיפוש מסוף / מספר..." style="width:190px;padding:6px 10px;" />
+        <input id="searchInput" type="search" placeholder="חיפוש מסוף / מספר..." style="width:185px;padding:6px 10px;" />
         <button id="toggleRouteBtn" type="button">📅 ימי קו</button>
         <button id="toggleCasBtn" type="button">🏦 כספונט</button>
         <button id="whatsappBtn" type="button" class="btn-whatsapp">💬 וואטסאפ</button>
@@ -314,7 +318,7 @@
           <input id="casUserInput" type="text" placeholder="שם משתמש בכספונט" />
           <input id="casPassInput" type="password" placeholder="סיסמה בכספונט" />
         </div>
-        <button id="saveAndSyncCasBtn" type="button" class="btn-primary">שמור ובקש סנכרון</button>
+        <button id="saveAndSyncCasBtn" type="button" class="btn-primary">שמור ובקש סנכרון מכספונט</button>
         <div id="casSyncStatus" class="status-note" style="margin-top:8px;"></div>
       </section>
 
@@ -457,7 +461,11 @@
           </div>
 
           <div class="terminal-controls">
-            <div class="cassette-box">
+            <div
+              class="cassette-box"
+              title="לחץ לעדכון סכום במחסנית"
+              onclick="openEditBalanceModal('${id}')"
+            >
               <span class="cassette-label">במחסנית (₪)</span>
               <span class="cassette-amount" id="cassette-val-${id}">${balanceFormatted}</span>
             </div>
@@ -512,6 +520,25 @@
       document.getElementById("statBalance").textContent = `₪${formatAmountILS(totalBalance)}`;
       document.getElementById("statPacks5k").textContent = String(totalPacks5k);
     }
+
+    window.openEditBalanceModal = async function (terminalId) {
+      if (!currentUser) return;
+      const t = currentTerminals.find((x) => String(x.id) === String(terminalId));
+      const currentBal = t ? Number(t.balance ?? 0) : 0;
+      const input = prompt(`הזן סכום חדש במחסנית (₪) למסוף ${terminalId}:`, String(currentBal));
+      if (input === null) return;
+      const parsedBal = Number(String(input).replace(/,/g, "").trim());
+      if (!Number.isFinite(parsedBal) || parsedBal < 0) {
+        alert("יש להזין סכום מספרי תקין בשקלים");
+        return;
+      }
+      await db
+        .collection("distributors")
+        .doc(currentUser.uid)
+        .collection("terminals")
+        .doc(String(terminalId))
+        .set({ balance: parsedBal, updatedAt: Date.now() }, { merge: true });
+    };
 
     window.openEditTargetModal = async function (terminalId) {
       if (!currentUser) return;
@@ -595,12 +622,12 @@
           document.getElementById("casUserInput").value = data.username;
         }
         if (data.syncRequested) {
-          statusEl.textContent = "בקשת סנכרון פעילה — ממתין להרצת הסנכרון...";
+          statusEl.textContent = "בקשת סנכרון מכספונט פעילה — ממתין לסקריפט הסנכרון...";
         } else if (data.lastSyncError) {
           statusEl.textContent = `שגיאת סנכרון: ${data.lastSyncError}`;
         } else if (data.lastSyncedAt) {
           const dt = new Date(Number(data.lastSyncedAt)).toLocaleString("he-IL");
-          statusEl.textContent = `סונכרן לאחרונה: ${dt} (${data.lastSyncCount ?? 0} מסופים)`;
+          statusEl.textContent = `סונכרן לאחרונה מכספונט: ${dt} (${data.lastSyncCount ?? 0} מסופים)`;
         }
       });
 
