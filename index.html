@@ -1,45 +1,182 @@
-<!-- בתוך רינדור כל כרטיס מסוף (התאם לשמות המשתנים של הכרטיס ב-index.html במידת הצורך): -->
-<div class="terminal-card" data-terminal-id="${t.id}">
-  <div class="terminal-header">
-    <div class="terminal-title">${t.name} <span class="terminal-id">(${t.id})</span></div>
-    <div class="terminal-meta">
-      סף התראה: ₪${Number(t.threshold ?? 3000).toLocaleString("he-IL")} •
-      <span class="target-inline">
-        יעד מילוי: <strong id="target-val-${t.id}">${Number(t.baseTargetK ?? 15)}k</strong>
-        <button
-          type="button"
-          class="icon-edit-btn"
-          title="ערוך יעד מילוי"
-          aria-label="ערוך יעד מילוי"
-          onclick="openEditTargetModal('${t.id}')"
-        >✏️</button>
-      </span>
-    </div>
-  </div>
+<style>
+  .terminal-card {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    margin-bottom: 10px;
+    border-radius: 10px;
+    background: #fff5f5;
+    border: 1px solid #f2d6d6;
+    direction: rtl;
+  }
 
-  <div class="terminal-controls">
-    <div class="cassette-box">
-      <span class="cassette-label">במחסנית (₪)</span>
-      <span class="cassette-amount" id="cassette-val-${t.id}">${Number(t.balance ?? 0).toLocaleString("he-IL")}</span>
-    </div>
+  .terminal-header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
 
-    <button
-      type="button"
-      class="btn-fill"
-      onclick="quickFillTerminal('${t.id}')"
-    >למלא ${Number(t.baseTargetK ?? 15)}k</button>
+  .terminal-title {
+    font-weight: 700;
+    font-size: 1rem;
+  }
 
-    <button
-      type="button"
-      class="btn-secondary"
-      onclick="markRefilled('${t.id}')"
-    >סמן הטענה</button>
+  .terminal-id {
+    font-weight: 400;
+    color: #555;
+  }
 
-    <button
-      type="button"
-      class="btn-remove"
-      title="הסר מסוף"
-      onclick="removeTerminal('${t.id}')"
-    >✕</button>
-  </div>
-</div>
+  .terminal-meta {
+    font-size: 0.9rem;
+    color: #444;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .target-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .icon-edit-btn {
+    background: transparent;
+    border: none;
+    padding: 2px 5px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    line-height: 1;
+    border-radius: 6px;
+  }
+
+  .icon-edit-btn:hover {
+    background: rgba(0, 0, 0, 0.08);
+  }
+
+  .terminal-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .cassette-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 115px;
+    padding: 4px 10px;
+    border-radius: 8px;
+    background: #ffffff;
+    border: 1px solid #ddd;
+  }
+
+  .cassette-label {
+    font-size: 0.75rem;
+    color: #666;
+  }
+
+  .cassette-amount {
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: #111;
+  }
+
+  .btn-fill {
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid #1d4ed8;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .btn-secondary {
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    background: #fff;
+    cursor: pointer;
+  }
+
+  .btn-remove {
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    background: #fff;
+    cursor: pointer;
+  }
+</style>
+
+<script>
+  function formatAmountILS(val) {
+    const num = Number(val ?? 0);
+    return Number.isFinite(num) ? num.toLocaleString("he-IL") : "0";
+  }
+
+  function renderTerminalCard(t) {
+    const id = String(t.id ?? "");
+    const name = String(t.name ?? `מסוף ${id}`);
+    const threshold = formatAmountILS(t.threshold ?? 3000);
+    const targetK = Number(t.baseTargetK ?? 15);
+    const balanceFormatted = formatAmountILS(t.balance ?? 0);
+
+    return `
+      <div class="terminal-card" data-terminal-id="${id}">
+        <div class="terminal-header">
+          <div class="terminal-title">${name} <span class="terminal-id">(${id})</span></div>
+          <div class="terminal-meta">
+            <span>סף התראה: ₪${threshold}</span>
+            <span>•</span>
+            <span class="target-inline">
+              <span>יעד מילוי: <strong id="target-val-${id}">${targetK}k</strong></span>
+              <button
+                type="button"
+                class="icon-edit-btn"
+                title="ערוך יעד מילוי"
+                aria-label="ערוך יעד מילוי"
+                onclick="openEditTargetModal('${id}')"
+              >✏️</button>
+            </span>
+          </div>
+        </div>
+
+        <div class="terminal-controls">
+          <div class="cassette-box">
+            <span class="cassette-label">במחסנית (₪)</span>
+            <span class="cassette-amount" id="cassette-val-${id}">${balanceFormatted}</span>
+          </div>
+
+          <button
+            type="button"
+            class="btn-fill"
+            onclick="quickFillTerminal('${id}')"
+          >למלא ${targetK}k</button>
+
+          <button
+            type="button"
+            class="btn-secondary"
+            onclick="markRefilled('${id}')"
+          >סמן הטענה</button>
+
+          <button
+            type="button"
+            class="btn-remove"
+            title="הסר מסוף"
+            onclick="removeTerminal('${id}')"
+          >✕</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderTerminalsList(containerEl, terminals) {
+    if (!containerEl) return;
+    containerEl.innerHTML = (terminals || []).map(renderTerminalCard).join("");
+  }
+</script>
