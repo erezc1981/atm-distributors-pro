@@ -371,6 +371,12 @@
       color: var(--success);
     }
 
+    .fill-display.empty-target {
+      background: #f8fafc;
+      border-color: #cbd5e1;
+      color: var(--muted);
+    }
+
     button {
       font-family: inherit;
       cursor: pointer;
@@ -598,8 +604,17 @@
       return t.sector === "arab" ? "arab" : "jewish";
     }
 
+    function hasConfiguredTargetK(t) {
+      if (!t) return false;
+      const raw = t.baseTargetK;
+      if (raw === null || raw === undefined || raw === "") return false;
+      const num = Number(raw);
+      return Number.isFinite(num) && num >= 0;
+    }
+
     function getEffectiveTargetK(t) {
-      const baseK = Number(t.baseTargetK ?? 15);
+      if (!hasConfiguredTargetK(t)) return null;
+      const baseK = Number(t.baseTargetK);
       const dayPct = Number(ADJUSTMENTS.refillDay?.[activeRules.refillDay] ?? 0);
       const periodPct = Number(ADJUSTMENTS.monthPeriod?.[activeRules.monthPeriod] ?? 0);
       const sector = getTerminalSector(t);
@@ -612,7 +627,8 @@
     }
 
     function calcLoadAmountILS(balance, targetK) {
-      const targetAmount = Number(targetK ?? 15) * 1000;
+      if (targetK === null || targetK === undefined) return 0;
+      const targetAmount = Number(targetK) * 1000;
       const currentBal = Number(balance ?? 0);
       const rawDiff = Math.max(0, targetAmount - currentBal);
       if (rawDiff === 0) return 0;
@@ -647,17 +663,25 @@
       const thresholdNum = getTerminalThreshold(t);
       const threshold = formatAmountILS(thresholdNum);
       const targetK = getEffectiveTargetK(t);
+      const hasTarget = targetK !== null;
       const rawBalance = Number(t.balance ?? 0);
       const balanceFormatted = formatAmountILS(rawBalance);
-      const loadAmount = calcLoadAmountILS(rawBalance, targetK);
+      const loadAmount = hasTarget ? calcLoadAmountILS(rawBalance, targetK) : 0;
       const isAlert = rawBalance <= thresholdNum;
       const sector = getTerminalSector(t);
       const sectorLabel = sector === "arab" ? "מגזר ערבי" : "מגזר יהודי";
       const sectorClass = sector === "arab" ? "sector-arab" : "sector-jewish";
 
-      const fillDisplayHtml = loadAmount > 0
-        ? `<span class="fill-display">למלא ₪${formatAmountILS(loadAmount)}</span>`
-        : `<span class="fill-display ok-badge">תקין (0)</span>`;
+      const targetDisplayText = hasTarget ? `${targetK}k` : "—";
+
+      let fillDisplayHtml;
+      if (!hasTarget) {
+        fillDisplayHtml = `<span class="fill-display empty-target">יעד לא הוגדר</span>`;
+      } else if (loadAmount > 0) {
+        fillDisplayHtml = `<span class="fill-display">למלא ₪${formatAmountILS(loadAmount)}</span>`;
+      } else {
+        fillDisplayHtml = `<span class="fill-display ok-badge">תקין (0)</span>`;
+      }
 
       return `
         <div class="terminal-card ${isAlert ? "" : "ok"}" data-terminal-id="${id}">
@@ -686,12 +710,12 @@
             <div class="metric-col">
               <span class="metric-label">יעד מילוי</span>
               <span class="target-inline">
-                <strong class="metric-val" id="target-val-${id}">${targetK}k</strong>
+                <strong class="metric-val" id="target-val-${id}">${targetDisplayText}</strong>
                 <button
                   type="button"
                   class="icon-edit-btn"
-                  title="ערוך יעד מילוי"
-                  aria-label="ערוך יעד מילוי"
+                  title="הזן / ערוך יעד מילוי"
+                  aria-label="הזן / ערוך יעד מילוי"
                   onclick="openEditTargetModal('${id}')"
                 >✏️</button>
               </span>
@@ -772,10 +796,20 @@
     window.openEditTargetModal = async function (terminalId) {
       if (!currentUser) return;
       const t = currentTerminals.find((x) => String(x.id) === String(terminalId));
-      const currentK = t ? Number(t.baseTargetK ?? 15) : 15;
-      const input = prompt(`הזן יעד מילוי בסיסי חדש באלפים (k) למסוף ${terminalId}:`, String(currentK));
+      const initialVal = hasConfiguredTargetK(t) ? String(Number(t.baseTargetK)) : "";
+      const input = prompt(`הזן יעד מילוי באלפים (k) למסוף ${terminalId}:`, initialVal);
       if (input === null) return;
-      const parsedK = Number(input);
+      const trimmed = input.trim();
+      if (trimmed === "") {
+        await db
+          .collection("distributors")
+          .doc(currentUser.uid)
+          .collection("terminals")
+          .doc(String(terminalId))
+          .set({ baseTargetK: null }, { merge: true });
+        return;
+      }
+      const parsedK = Number(trimmed);
       if (!Number.isFinite(parsedK) || parsedK < 0) {
         alert("יש להזין מספר תקין באלפים");
         return;
@@ -976,8 +1010,11 @@
       currentTerminals.forEach((t, idx) => {
         const targetK = getEffectiveTargetK(t);
         const loadAmt = calcLoadAmountILS(t.balance, targetK);
-        const statusText = loadAmt > 0 ? `למלא ₪${formatAmountILS(loadAmt)}` : "תקין (0)";
-        lines.push(`${idx + 1}. ${t.name} (${t.id}): במחסנית ₪${formatAmountILS(t.balance)} | יעד ${targetK}k | ${statusText}`);
+        const targetLabel = targetK !== null ? `${targetK}k` : "לא הוגדר";
+        const statusText = targetK === null
+          ? "יעד לא הוגדר"
+          : (loadAmt > 0 ? `למלא ₪${formatAmountILS(loadAmt)}` : "תקין (0)");
+        lines.push(`${idx + 1}. ${t.name} (${t.id}): במחסנית ₪${formatAmountILS(t.balance)} | יעד ${targetLabel} | ${statusText}`);
       });
       const url = `https://wa.me/?text=${encodeURIComponent(lines.join("\n"))}`;
       window.open(url, "_blank");
