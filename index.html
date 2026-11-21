@@ -344,12 +344,12 @@
 
   <script>
     const firebaseConfig = {
-      apiKey: "AIzaSyD-PLACEHOLDER",
+      apiKey: "AIzaSyBKQfbitijJHfIGAKg9N2aNVt6BCHEYsCU",
       authDomain: "atm-distributors-pro.firebaseapp.com",
       projectId: "atm-distributors-pro",
-      storageBucket: "atm-distributors-pro.appspot.com",
-      messagingSenderId: "000000000000",
-      appId: "1:000000000000:web:000000000000"
+      storageBucket: "atm-distributors-pro.firebasestorage.app",
+      messagingSenderId: "431026876840",
+      appId: "1:431026876840:web:63b951eedeeaa47be92d9d"
     };
 
     if (!firebase.apps.length) {
@@ -390,7 +390,7 @@
 
     function getEffectiveTargetK(t, dateObj = new Date()) {
       const baseK = Number(t.baseTargetK ?? 15);
-      const dayOfWeek = dateObj.getDay(); // 0=Sunday ... 4=Thursday
+      const dayOfWeek = dateObj.getDay();
       let factor = 1;
       if (dayOfWeek === 4) {
         factor = Number(t.thursdayMultiplier ?? 1.25);
