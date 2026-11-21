@@ -65,6 +65,10 @@
       border-radius: 16px; padding: 22px; border: 1px solid var(--border);
       box-shadow: 0 6px 20px rgba(0,0,0,0.08);
     }
+    .step-tag {
+      display: inline-block; background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe;
+      font-size: 0.78rem; font-weight: 800; padding: 4px 10px; border-radius: 999px; margin-bottom: 8px;
+    }
     .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
     .field label { font-size: 0.85rem; font-weight: 700; }
     .field input {
@@ -218,10 +222,12 @@
   </div>
 </div>
 
+<!-- שלב 1 בהתקנה: פרטי ימי הפעלת הקו -->
 <div id="wizardSection" class="wizard-box hidden">
+  <span class="step-tag">שלב 1 מתוך 2 — הגדרת קו</span>
   <h2 style="margin-top:0;">הגדרת ימי הפעלת הקו</h2>
   <p style="color:var(--muted); font-size:0.88rem;">
-    בחר תבנית מהירה או סמן את ימי ההטענה של הקו שלך (ימים א'–ו'). המערכת תחשב אוטומטית את טווח הימים עד ההטענה הבאה.
+    בחר תבנית מהירה או סמן את ימי ההטענה של הקו שלך (ימים א'–ו'). מיד לאחר מכן תעבור להתחברות לכספונט למשיכת המסופים.
   </p>
 
   <div class="presets-grid">
@@ -245,15 +251,17 @@
   </div>
 
   <button id="saveWizardBtn" class="btn btn-primary" style="width:100%; justify-content:center; padding:12px;" onclick="saveRouteWizard()">
-    שמור ימי קו והמשך לפרטי כספונט
+    שמור ימי קו והמשך לכספונט
   </button>
   <div id="wizardMsg" style="color:#dc2626; font-size:0.85rem; margin-top:8px;"></div>
 </div>
 
+<!-- שלב 2 בהתקנה: שם משתמש וסיסמה לכספונט -->
 <div id="casLoginSection" class="cas-box hidden">
+  <span class="step-tag">שלב 2 מתוך 2 — משיכת מסופים מכספונט</span>
   <h2 style="margin-top:0;">התחברות לכספונט (CAS Mobile)</h2>
   <p style="color:var(--muted); font-size:0.88rem;">
-    הזן את פרטי הכניסה לחשבון הכספונט שלך (<code>casmobile.co.il</code>) למשיכת המסופים והיתרות למרחב המבודד שלך.
+    הזן את שם המשתמש והסיסמה שלך ל-<code>casmobile.co.il</code> כדי למשוך את המסופים והיתרות שלך אל הדשבורד.
   </p>
 
   <div class="field">
@@ -267,8 +275,8 @@
   </div>
 
   <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;">
-    <button class="btn btn-primary" style="flex:1; justify-content:center; padding:12px;" onclick="saveCasCredentialsAndContinue()">
-      שמור התחברות לכספונט והמשך
+    <button id="saveCasBtn" class="btn btn-primary" style="flex:1; justify-content:center; padding:12px;" onclick="saveCasCredentialsAndContinue()">
+      התחבר לכספונט ומשוך מסופים
     </button>
     <button class="btn btn-outline" onclick="skipCasAndGoDashboard()">דלג לעכשיו</button>
   </div>
@@ -277,7 +285,7 @@
 
 <div id="mainDashboard" class="container hidden">
   <div id="emptyTerminalsBanner" class="status-banner hidden">
-    <span id="casSyncStatusText">פרטי כספונט נשמרו. ממתין לסנכרון כספונט או להוספת מסוף בקו.</span>
+    <span id="casSyncStatusText">ממתין לסנכרון המסופים מכספונט. לחץ על "רענן סנכרון כספונט" או הוסף מסוף למטה.</span>
     <button class="btn btn-primary" onclick="requestCasSyncNow()">🔄 רענן סנכרון כספונט</button>
   </div>
 
@@ -341,6 +349,9 @@
     appId: "1:431026876840:web:63b951eedeeaa47be92d9d"
   };
 
+  // אם תגדיר בהמשך כתובת Endpoint שמבצעת התחברות ל-casmobile.co.il ומחזירה { terminals: [...] }, האפליקציה תייבא אוטומטית כבר בהתחברות
+  const CAS_SYNC_ENDPOINT = "";
+
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const db = getFirestore(app);
@@ -364,6 +375,7 @@
   let completedToday = {};
   let editingFillDocId = null;
   let unsubscribeTerminals = null;
+  let justRegistered = false;
 
   function getDefaultDayIdx() {
     const d = new Date().getDay();
@@ -392,6 +404,7 @@
     const email = document.getElementById("authEmail").value.trim();
     const pass = document.getElementById("authPassword").value;
     document.getElementById("authMsg").textContent = "";
+    justRegistered = false;
     try {
       await signInWithEmailAndPassword(auth, email, pass);
     } catch (e) {
@@ -403,6 +416,7 @@
     const email = document.getElementById("authEmail").value.trim();
     const pass = document.getElementById("authPassword").value;
     document.getElementById("authMsg").textContent = "";
+    justRegistered = true;
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, pass);
       const now = Date.now();
@@ -415,6 +429,7 @@
         billingCycle: "monthly"
       });
     } catch (e) {
+      justRegistered = false;
       document.getElementById("authMsg").textContent = "שגיאת הרשמה: " + e.message;
     }
   };
@@ -497,7 +512,8 @@
       }
     } catch (_) {}
 
-    if (!hasSavedRoute) {
+    if (justRegistered || !hasSavedRoute) {
+      justRegistered = false;
       openRouteWizard();
       return;
     }
@@ -593,9 +609,36 @@
     showSection("casLoginSection");
   };
 
+  async function pullTerminalsFromCasEndpointIfConfigured(username, password) {
+    if (!CAS_SYNC_ENDPOINT) return false;
+    const res = await fetch(CAS_SYNC_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password, uid: currentUser.uid })
+    });
+    if (!res.ok) throw new Error("שגיאה בחיבור לכספונט");
+    const data = await res.json();
+    const list = Array.isArray(data.terminals) ? data.terminals : [];
+    for (let idx = 0; idx < list.length; idx++) {
+      const item = list[idx];
+      const termId = String(item.id || item.terminalId || idx + 1);
+      await setDoc(doc(db, "distributors", currentUser.uid, "terminals", termId), {
+        id: termId,
+        name: String(item.name || item.location || ("מסוף " + termId)),
+        balance: Math.max(0, Number(item.balance) || 0),
+        baseTargetK: Math.max(1, Number(item.baseTargetK) || 15),
+        threshold: Math.max(0, Number(item.threshold) || 3000),
+        order: idx + 1,
+        syncedAt: Date.now()
+      }, { merge: true });
+    }
+    return list.length > 0;
+  }
+
   window.saveCasCredentialsAndContinue = async function() {
     const username = document.getElementById("casUsernameInput").value.trim();
     const password = document.getElementById("casPasswordInput").value;
+    const btn = document.getElementById("saveCasBtn");
     document.getElementById("casMsg").textContent = "";
 
     if (!username || !password) {
@@ -603,6 +646,8 @@
       return;
     }
 
+    btn.disabled = true;
+    btn.textContent = "מתחבר לכספונט ומושך מסופים...";
     casCredentials = { username, password };
 
     try {
@@ -612,9 +657,13 @@
         syncRequested: true,
         updatedAt: Date.now()
       }, { merge: true });
+
+      await pullTerminalsFromCasEndpointIfConfigured(username, password);
     } catch (e) {
-      document.getElementById("casMsg").textContent = "שגיאה בשמירת פרטי כספונט: " + e.message;
-      return;
+      document.getElementById("casMsg").textContent = "הפרטים נשמרו, אך הסנכרון הישיר נכשל: " + e.message;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "התחבר לכספונט ומשוך מסופים";
     }
 
     await openDashboardView();
@@ -622,12 +671,13 @@
 
   window.requestCasSyncNow = async function() {
     if (!currentUser) return;
-    document.getElementById("casSyncStatusText").textContent = "נשלחה בקשת סנכרון מול כספונט...";
+    document.getElementById("casSyncStatusText").textContent = "מתחבר לכספונט ומושך מסופים...";
     try {
       await setDoc(doc(db, "distributors", currentUser.uid, "settings", "cas_sync"), {
         syncRequested: true,
         updatedAt: Date.now()
       }, { merge: true });
+      await pullTerminalsFromCasEndpointIfConfigured(casCredentials.username, casCredentials.password);
     } catch (_) {}
   };
 
@@ -679,7 +729,6 @@
     const bal = Number(t.balance) || 0;
     const spanMult = getDaySpanMultiplier(selectedDayIdx);
 
-    // אם המפיץ ערך ישירות את סכום המילוי (באלפים), נעדכן יעד מותאם או מילוי מפורש
     const requiredTargetUnits = Math.max(1, Math.round((bal + (manualFillK * 1000)) / 1000));
     const adjustedBaseTargetK = Math.max(1, Math.round(requiredTargetUnits / spanMult));
 
