@@ -60,7 +60,7 @@
 
     .container { max-width: 960px; margin: 0 auto; padding: 16px; }
 
-    .auth-box, .wizard-box, .paywall-box {
+    .auth-box, .wizard-box, .cas-box, .paywall-box {
       max-width: 540px; margin: 28px auto; background: var(--card);
       border-radius: 16px; padding: 22px; border: 1px solid var(--border);
       box-shadow: 0 6px 20px rgba(0,0,0,0.08);
@@ -169,6 +169,7 @@
     </div>
     <div style="display:flex; gap:8px; flex-wrap:wrap;">
       <button class="btn btn-glass" onclick="openRouteWizard()">📅 ימי קו</button>
+      <button class="btn btn-glass" onclick="openCasLoginScreen()">🏦 כספונט</button>
       <button class="btn btn-wa" onclick="sendWhatsappReport()">📲 וואטסאפ</button>
       <button class="btn btn-glass" onclick="logoutUser()">יציאה</button>
     </div>
@@ -206,6 +207,7 @@
   </div>
 </div>
 
+<!-- שלב 1 בהתקנה: בחירת ימי הפעלת הקו -->
 <div id="wizardSection" class="wizard-box hidden">
   <h2 style="margin-top:0;">הגדרת ימי הפעלת הקו</h2>
   <p style="color:var(--muted); font-size:0.88rem;">
@@ -233,14 +235,40 @@
   </div>
 
   <button id="saveWizardBtn" class="btn btn-primary" style="width:100%; justify-content:center; padding:12px;" onclick="saveRouteWizard()">
-    שמור ימי קו והמשך לניהול המסופים
+    שמור ימי קו והמשך לפרטי כספונט
   </button>
   <div id="wizardMsg" style="color:#dc2626; font-size:0.85rem; margin-top:8px;"></div>
 </div>
 
+<!-- שלב 2 בהתקנה: פרטי התחברות לכספונט -->
+<div id="casLoginSection" class="cas-box hidden">
+  <h2 style="margin-top:0;">התחברות לכספונט (CAS Mobile)</h2>
+  <p style="color:var(--muted); font-size:0.88rem;">
+    הזן את פרטי הכניסה לחשבון הכספונט שלך (<code>casmobile.co.il</code>) כדי למשוך אוטומטית את המסופים והיתרות שלך למרחב המבודד שלך.
+  </p>
+
+  <div class="field">
+    <label>שם משתמש בכספונט</label>
+    <input id="casUsernameInput" type="text" placeholder="שם משתמש ב-casmobile.co.il" autocomplete="username" />
+  </div>
+
+  <div class="field">
+    <label>סיסמה בכספונט</label>
+    <input id="casPasswordInput" type="password" placeholder="סיסמה ב-casmobile.co.il" autocomplete="current-password" />
+  </div>
+
+  <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;">
+    <button class="btn btn-primary" style="flex:1; justify-content:center; padding:12px;" onclick="saveCasCredentialsAndContinue()">
+      שמור התחברות לכספונט והמשך
+    </button>
+    <button class="btn btn-outline" onclick="skipCasAndGoDashboard()">דלג לעכשיו</button>
+  </div>
+  <div id="casMsg" style="color:#dc2626; font-size:0.85rem; margin-top:10px;"></div>
+</div>
+
 <div id="mainDashboard" class="container hidden">
   <div id="emptyTerminalsBanner" class="status-banner hidden">
-    ימי הקו נשמרו בהצלחה. כעת הוסף את המסופים שלך בטופס שלמטה והגדר יעד לכל מסוף.
+    ימי הקו ופרטי כספונט נשמרו. המסופים ימשכו אוטומטית מהסנכרון שלך מול כספונט, ובנוסף ניתן להוסיף או לעדכן מסופים ויעדים כאן למטה.
   </div>
 
   <div class="summary-grid">
@@ -319,6 +347,7 @@
   let currentUser = null;
   let distributorProfile = null;
   let routeSettings = { activeDays: [0, 2, 4] };
+  let casCredentials = { username: "", password: "" };
   let selectedWizardDays = [0, 2, 4];
   let selectedDayIdx = getDefaultDayIdx();
   let terminals = [];
@@ -340,7 +369,7 @@
   }
 
   function showSection(sectionId) {
-    ["authSection", "paywallSection", "wizardSection", "mainDashboard"].forEach(id => {
+    ["authSection", "paywallSection", "wizardSection", "casLoginSection", "mainDashboard"].forEach(id => {
       const el = document.getElementById(id);
       if (id === sectionId) el.classList.remove("hidden");
       else el.classList.add("hidden");
@@ -457,13 +486,17 @@
       return;
     }
 
-    if (!routeSettings.activeDays.includes(selectedDayIdx)) {
-      selectedDayIdx = routeSettings.activeDays[0];
-    }
+    try {
+      const casSnap = await getDoc(doc(db, "distributors", currentUser.uid, "settings", "cas_sync"));
+      if (casSnap.exists()) {
+        casCredentials = {
+          username: casSnap.data().username || "",
+          password: casSnap.data().password || ""
+        };
+      }
+    } catch (_) {}
 
-    await loadTerminals();
-    showSection("mainDashboard");
-    renderDashboard();
+    await openDashboardView();
   }
 
   function updateSubscriptionBadge() {
@@ -533,10 +566,56 @@
       return;
     }
 
+    openCasLoginScreen();
+  };
+
+  window.openCasLoginScreen = function() {
+    document.getElementById("appHeader").classList.remove("hidden");
+    document.getElementById("casMsg").textContent = "";
+    document.getElementById("casUsernameInput").value = casCredentials.username || "";
+    document.getElementById("casPasswordInput").value = casCredentials.password || "";
+    showSection("casLoginSection");
+  };
+
+  window.saveCasCredentialsAndContinue = async function() {
+    const username = document.getElementById("casUsernameInput").value.trim();
+    const password = document.getElementById("casPasswordInput").value;
+    document.getElementById("casMsg").textContent = "";
+
+    if (!username || !password) {
+      document.getElementById("casMsg").textContent = "יש להזין שם משתמש וסיסמה של כספונט.";
+      return;
+    }
+
+    casCredentials = { username, password };
+
+    try {
+      await setDoc(doc(db, "distributors", currentUser.uid, "settings", "cas_sync"), {
+        username,
+        password,
+        syncRequested: true,
+        updatedAt: Date.now()
+      }, { merge: true });
+    } catch (e) {
+      document.getElementById("casMsg").textContent = "שגיאה בשמירת פרטי כספונט: " + e.message;
+      return;
+    }
+
+    await openDashboardView();
+  };
+
+  window.skipCasAndGoDashboard = async function() {
+    await openDashboardView();
+  };
+
+  async function openDashboardView() {
+    if (!routeSettings.activeDays.includes(selectedDayIdx)) {
+      selectedDayIdx = routeSettings.activeDays[0] ?? 0;
+    }
     await loadTerminals();
     showSection("mainDashboard");
     renderDashboard();
-  };
+  }
 
   async function loadTerminals() {
     terminals = [];
