@@ -232,11 +232,6 @@
     <div id="daysChips" class="days-grid"></div>
   </div>
 
-  <div class="field">
-    <label>יעד בסיס למסוף חדש (באלפים, למשל 15 = 15,000 ₪)</label>
-    <input id="defaultTargetInput" type="number" min="1" value="15" />
-  </div>
-
   <button id="saveWizardBtn" class="btn btn-primary" style="width:100%; justify-content:center; padding:12px;" onclick="saveRouteWizard()">
     שמור ימי קו והמשך לניהול המסופים
   </button>
@@ -245,7 +240,7 @@
 
 <div id="mainDashboard" class="container hidden">
   <div id="emptyTerminalsBanner" class="status-banner hidden">
-    ימי הקו נשמרו בהצלחה. כעת הוסף את המסופים שלך בטופס שלמטה (או עדכן יתרה במחסנית) כדי להתחיל לחשב הטענות וחבילות 5k.
+    ימי הקו נשמרו בהצלחה. כעת הוסף את המסופים שלך בטופס שלמטה והגדר יעד לכל מסוף.
   </div>
 
   <div class="summary-grid">
@@ -283,7 +278,7 @@
     <strong style="width:100%; font-size:0.9rem;">הוספת מסוף לקו שלי:</strong>
     <input id="newTermId" type="text" placeholder="מזהה מסוף (למשל 6001234)" style="width:165px;" />
     <input id="newTermName" type="text" placeholder="שם המסוף / מיקום" style="flex:1; min-width:160px;" />
-    <input id="newTermTarget" type="number" min="1" value="15" placeholder="יעד (באלפים)" style="width:110px;" />
+    <input id="newTermTarget" type="number" min="1" value="15" placeholder="יעד למסוף (באלפים)" style="width:130px;" />
     <input id="newTermThreshold" type="number" min="0" value="3000" placeholder="סף התראה (₪)" style="width:115px;" />
     <button class="btn btn-primary" onclick="addTerminal()">+ הוסף מסוף</button>
   </div>
@@ -323,7 +318,7 @@
 
   let currentUser = null;
   let distributorProfile = null;
-  let routeSettings = { activeDays: [0, 2, 4], defaultTargetK: 15 };
+  let routeSettings = { activeDays: [0, 2, 4] };
   let selectedWizardDays = [0, 2, 4];
   let selectedDayIdx = getDefaultDayIdx();
   let terminals = [];
@@ -452,7 +447,7 @@
     try {
       const routeSnap = await getDoc(doc(db, "distributors", currentUser.uid, "settings", "route"));
       if (routeSnap.exists() && Array.isArray(routeSnap.data().activeDays) && routeSnap.data().activeDays.length > 0) {
-        routeSettings = routeSnap.data();
+        routeSettings = { activeDays: routeSnap.data().activeDays };
         hasSavedRoute = true;
       }
     } catch (_) {}
@@ -488,8 +483,6 @@
     document.getElementById("wizardMsg").textContent = "";
     showSection("wizardSection");
     selectedWizardDays = [...(routeSettings.activeDays || [0, 2, 4])];
-    document.getElementById("defaultTargetInput").value = routeSettings.defaultTargetK || 15;
-    document.getElementById("newTermTarget").value = routeSettings.defaultTargetK || 15;
     renderWizardDays();
   };
 
@@ -527,9 +520,7 @@
       document.getElementById("wizardMsg").textContent = "יש לבחור לפחות יום הפעלה אחד לקו.";
       return;
     }
-    const defaultTargetK = Math.max(1, parseInt(document.getElementById("defaultTargetInput").value, 10) || 15);
-    routeSettings = { activeDays: [...selectedWizardDays].sort((a, b) => a - b), defaultTargetK };
-    document.getElementById("newTermTarget").value = defaultTargetK;
+    routeSettings = { activeDays: [...selectedWizardDays].sort((a, b) => a - b) };
 
     if (!routeSettings.activeDays.includes(selectedDayIdx)) {
       selectedDayIdx = routeSettings.activeDays[0];
@@ -584,7 +575,7 @@
   window.addTerminal = async function() {
     const id = document.getElementById("newTermId").value.trim();
     const name = document.getElementById("newTermName").value.trim();
-    const baseTargetK = Math.max(1, parseInt(document.getElementById("newTermTarget").value, 10) || routeSettings.defaultTargetK || 15);
+    const baseTargetK = Math.max(1, parseInt(document.getElementById("newTermTarget").value, 10) || 15);
     const threshold = Math.max(0, parseInt(document.getElementById("newTermThreshold").value, 10) || 3000);
     if (!id || !name) return;
 
@@ -662,7 +653,7 @@
             <strong>${i + 1}. ${t.name}</strong>
             <span style="font-size:0.78rem; color:var(--muted);">(${t.id})</span>
           </div>
-          <div style="font-size:0.76rem; color:var(--muted);">סף התראה: ${(t.threshold || 3000).toLocaleString()} ₪ • יעד בסיס: ${t.baseTargetK} אלף</div>
+          <div style="font-size:0.76rem; color:var(--muted);">סף התראה: ${(t.threshold || 3000).toLocaleString()} ₪ • יעד מסוף: ${t.baseTargetK} אלף</div>
         </div>
         <div class="term-metrics">
           <div>
