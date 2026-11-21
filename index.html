@@ -359,6 +359,9 @@
     const db = firebase.firestore();
 
     const DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+    const EXCLUDED_TERMINAL_IDS = new Set(["6004159"]);
+    const LOW_THRESHOLD_2K_NAMES = ["גבעת רם", "ננקיקו לוקו"];
+
     let currentUser = null;
     let currentTerminals = [];
     let unsubscribeTerminals = null;
@@ -367,6 +370,37 @@
     function formatAmountILS(val) {
       const num = Number(val ?? 0);
       return Number.isFinite(num) ? num.toLocaleString("he-IL") : "0";
+    }
+
+    function getTerminalThreshold(t) {
+      if (t.threshold !== undefined && t.threshold !== null && t.threshold !== "") {
+        return Number(t.threshold);
+      }
+      const nameStr = String(t.name || "");
+      if (LOW_THRESHOLD_2K_NAMES.some((n) => nameStr.includes(n))) {
+        return 2000;
+      }
+      return 3000;
+    }
+
+    function isTenthAdjustmentDay(dateObj = new Date()) {
+      const dayOfMonth = dateObj.getDate();
+      return dayOfMonth >= 8 && dayOfMonth <= 12;
+    }
+
+    function getEffectiveTargetK(t, dateObj = new Date()) {
+      const baseK = Number(t.baseTargetK ?? 15);
+      const dayOfWeek = dateObj.getDay(); // 0=Sunday ... 4=Thursday
+      let factor = 1;
+      if (dayOfWeek === 4) {
+        factor = Number(t.thursdayMultiplier ?? 1.25);
+      } else if (dayOfWeek >= 1 && dayOfWeek <= 3) {
+        factor = Number(t.midweekMultiplier ?? 1);
+      }
+      if (isTenthAdjustmentDay(dateObj)) {
+        factor *= Number(t.tenthMultiplier ?? 1.15);
+      }
+      return Math.max(0, Math.round(baseK * factor));
     }
 
     function calcPacks5k(balance, targetK) {
@@ -379,9 +413,10 @@
     function renderTerminalCard(t) {
       const id = String(t.id ?? "");
       const name = String(t.name ?? `מסוף ${id}`);
-      const thresholdNum = Number(t.threshold ?? 3000);
+      const thresholdNum = getTerminalThreshold(t);
       const threshold = formatAmountILS(thresholdNum);
-      const targetK = Number(t.baseTargetK ?? 15);
+      const targetK = getEffectiveTargetK(t);
+      const packs5k = calcPacks5k(t.balance, targetK);
       const rawBalance = Number(t.balance ?? 0);
       const balanceFormatted = formatAmountILS(rawBalance);
       const isAlert = rawBalance <= thresholdNum;
@@ -403,6 +438,8 @@
                   onclick="openEditTargetModal('${id}')"
                 >✏️</button>
               </span>
+              <span>•</span>
+              <span>יחידות 5k: <strong>${packs5k}</strong></span>
             </div>
           </div>
 
@@ -441,10 +478,10 @@
 
       const totalBalance = terminals.reduce((acc, t) => acc + Number(t.balance ?? 0), 0);
       const alertsCount = terminals.filter(
-        (t) => Number(t.balance ?? 0) <= Number(t.threshold ?? 3000)
+        (t) => Number(t.balance ?? 0) <= getTerminalThreshold(t)
       ).length;
       const totalPacks5k = terminals.reduce(
-        (acc, t) => acc + calcPacks5k(t.balance, t.baseTargetK),
+        (acc, t) => acc + calcPacks5k(t.balance, getEffectiveTargetK(t)),
         0
       );
 
@@ -458,7 +495,7 @@
       if (!currentUser) return;
       const t = currentTerminals.find((x) => String(x.id) === String(terminalId));
       const currentK = t ? Number(t.baseTargetK ?? 15) : 15;
-      const input = prompt(`הזן יעד מילוי חדש באלפים (k) למסוף ${terminalId}:`, String(currentK));
+      const input = prompt(`הזן יעד מילוי בסיסי חדש באלפים (k) למסוף ${terminalId}:`, String(currentK));
       if (input === null) return;
       const parsedK = Number(input);
       if (!Number.isFinite(parsedK) || parsedK < 0) {
@@ -476,7 +513,7 @@
     window.quickFillTerminal = async function (terminalId) {
       if (!currentUser) return;
       const t = currentTerminals.find((x) => String(x.id) === String(terminalId));
-      const targetAmount = Number(t?.baseTargetK ?? 15) * 1000;
+      const targetAmount = getEffectiveTargetK(t || {}) * 1000;
       await db
         .collection("distributors")
         .doc(currentUser.uid)
@@ -548,6 +585,7 @@
       unsubscribeTerminals = userRef.collection("terminals").onSnapshot((snap) => {
         currentTerminals = snap.docs
           .map((d) => ({ id: d.id, ...d.data() }))
+          .filter((t) => !EXCLUDED_TERMINAL_IDS.has(String(t.id)))
           .sort((a, b) => Number(a.order ?? 999) - Number(b.order ?? 999));
         updateStatsAndList(currentTerminals);
       });
@@ -622,8 +660,9 @@
     document.getElementById("whatsappBtn").addEventListener("click", () => {
       const lines = ["*דוח מצב מסופים — ATM Pro*"];
       currentTerminals.forEach((t) => {
-        const packs = calcPacks5k(t.balance, t.baseTargetK);
-        lines.push(`• ${t.name} (${t.id}): יתרה ₪${formatAmountILS(t.balance)} | יעד ${t.baseTargetK ?? 15}k | יחידות 5k: ${packs}`);
+        const targetK = getEffectiveTargetK(t);
+        const packs = calcPacks5k(t.balance, targetK);
+        lines.push(`• ${t.name} (${t.id}): יתרה ₪${formatAmountILS(t.balance)} | יעד ${targetK}k | יחידות 5k: ${packs}`);
       });
       const url = `https://wa.me/?text=${encodeURIComponent(lines.join("\n"))}`;
       window.open(url, "_blank");
