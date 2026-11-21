@@ -208,6 +208,24 @@
       color: #fff;
     }
 
+    .days-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 10px 0;
+    }
+
+    .day-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: #f9fafb;
+      border: 1px solid var(--border);
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+    }
+
     .schedule-table {
       width: 100%;
       border-collapse: collapse;
@@ -227,8 +245,7 @@
       font-weight: 700;
     }
 
-    .schedule-table input[type="number"],
-    .schedule-table select {
+    .schedule-table input[type="number"] {
       width: 95px;
       padding: 5px 8px;
       border: 1px solid #cbd5e1;
@@ -469,6 +486,7 @@
       <div class="toolbar">
         <input id="searchInput" type="search" placeholder="חיפוש מסוף / מספר..." style="width:165px;padding:6px 10px;color:#111827;" />
         <button id="refreshBtn" type="button">🔄 רענן</button>
+        <button id="toggleRouteBtn" type="button">📅 ימי קו</button>
         <button id="toggleScheduleBtn" type="button">📊 טבלת טעינה וחגים</button>
         <button id="toggleCasBtn" type="button">🏦 כספונט</button>
         <button id="whatsappBtn" type="button" class="btn-whatsapp">💬 שלח לוואטסאפ</button>
@@ -477,6 +495,14 @@
     </header>
 
     <main class="container">
+      <!-- הגדרת ימי קו -->
+      <section id="routePanel" class="panel hidden">
+        <strong>הגדרת ימי קו</strong>
+        <div id="daysContainer" class="days-row"></div>
+        <button id="saveRouteBtn" type="button" class="btn-primary">שמור ימי קו</button>
+        <span id="routeSavedMsg" class="status-note"></span>
+      </section>
+
       <!-- טבלת ימי הטענה וחגים -->
       <section id="schedulePanel" class="panel hidden">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
@@ -585,6 +611,8 @@
     const auth = firebase.auth();
     const db = firebase.firestore();
 
+    const DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+
     const DEFAULT_ADJUSTMENTS = {
       refillDay: { midweek: 0, thursday: 25 },
       monthPeriod: { regular: 0, salaries: 15, allowances: 15 },
@@ -649,15 +677,27 @@
       return Math.max(0, Math.round(baseK * totalFactor));
     }
 
+    // עיגול סכום ההטענה לכפולות של 5,000 ₪ (למשל 10,300 -> 10,000 או 15,000 לפי nearest 5k)
     function calcLoadAmountILS(balance, targetK) {
       const targetAmount = Number(targetK ?? 15) * 1000;
       const currentBal = Number(balance ?? 0);
-      return Math.max(0, targetAmount - currentBal);
+      const rawDiff = Math.max(0, targetAmount - currentBal);
+      if (rawDiff === 0) return 0;
+      const roundedTo5k = Math.round(rawDiff / 5000) * 5000;
+      return roundedTo5k > 0 ? roundedTo5k : 5000;
     }
 
     function calcPacks5k(loadAmountILS) {
       const rawPacks = Math.round(Number(loadAmountILS ?? 0) / 5000);
       return rawPacks > 0 && rawPacks % 2 === 1 ? rawPacks + 1 : rawPacks;
+    }
+
+    function renderDaysSelector(selectedDays = []) {
+      const wrap = document.getElementById("daysContainer");
+      wrap.innerHTML = DAYS.map((day, idx) => {
+        const checked = selectedDays.includes(idx) ? "checked" : "";
+        return `<label class="day-chip"><input type="checkbox" value="${idx}" ${checked} /> ${day}</label>`;
+      }).join("");
     }
 
     function renderScheduleTable() {
@@ -910,6 +950,11 @@
 
       const userRef = db.collection("distributors").doc(uid);
 
+      userRef.collection("settings").doc("route").get().then((snap) => {
+        const days = snap.exists && Array.isArray(snap.data().days) ? snap.data().days : [0, 2, 4];
+        renderDaysSelector(days);
+      });
+
       unsubscribeSchedule = userRef.collection("settings").doc("schedule_rules").onSnapshot((snap) => {
         if (snap.exists) {
           const data = snap.data() || {};
@@ -1008,6 +1053,10 @@
       auth.signOut();
     });
 
+    document.getElementById("toggleRouteBtn").addEventListener("click", () => {
+      document.getElementById("routePanel").classList.toggle("hidden");
+    });
+
     document.getElementById("toggleScheduleBtn").addEventListener("click", () => {
       renderScheduleTable();
       document.getElementById("schedulePanel").classList.toggle("hidden");
@@ -1015,6 +1064,17 @@
 
     document.getElementById("toggleCasBtn").addEventListener("click", () => {
       document.getElementById("casPanel").classList.toggle("hidden");
+    });
+
+    document.getElementById("saveRouteBtn").addEventListener("click", async () => {
+      if (!currentUser) return;
+      const days = [...document.querySelectorAll("#daysContainer input:checked")].map((el) => Number(el.value));
+      await db.collection("distributors").doc(currentUser.uid).collection("settings").doc("route").set({
+        days,
+        updatedAt: Date.now()
+      }, { merge: true });
+      document.getElementById("routeSavedMsg").textContent = "נשמר";
+      setTimeout(() => { document.getElementById("routeSavedMsg").textContent = ""; }, 2000);
     });
 
     document.getElementById("saveAndSyncCasBtn").addEventListener("click", async () => {
@@ -1054,6 +1114,7 @@
       window.open(url, "_blank");
     });
 
+    renderDaysSelector([0, 2, 4]);
     renderScheduleTable();
     syncRuleChipButtons();
 
