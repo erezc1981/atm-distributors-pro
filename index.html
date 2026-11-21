@@ -294,7 +294,8 @@
         <span id="userEmailBadge" class="status-note"></span>
       </div>
       <div class="toolbar">
-        <input id="searchInput" type="search" placeholder="חיפוש מסוף / מספר..." style="width:185px;padding:6px 10px;" />
+        <input id="searchInput" type="search" placeholder="חיפוש מסוף / מספר..." style="width:175px;padding:6px 10px;" />
+        <button id="cleanupStaleBtn" type="button">🧹 נקה מיותרים</button>
         <button id="toggleRouteBtn" type="button">📅 ימי קו</button>
         <button id="toggleCasBtn" type="button">🏦 כספונט</button>
         <button id="whatsappBtn" type="button" class="btn-whatsapp">💬 וואטסאפ</button>
@@ -591,6 +592,25 @@
         .doc(String(terminalId))
         .delete();
     };
+
+    document.getElementById("cleanupStaleBtn").addEventListener("click", async () => {
+      if (!currentUser) return;
+      const snap = await db
+        .collection("distributors")
+        .doc(currentUser.uid)
+        .collection("terminals")
+        .get();
+      const invalidDocs = snap.docs.filter((d) => !isValidTerminalDoc(d.id, d.data()));
+      if (invalidDocs.length === 0) {
+        alert("לא נמצאו מסמכים לא תקינים למחיקה ב-Firestore.");
+        return;
+      }
+      if (!confirm(`למחוק ${invalidDocs.length} מסמכים לא תקינים/מוחרגים מ-Firestore?`)) return;
+      const batch = db.batch();
+      invalidDocs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      alert(`נמחקו ${invalidDocs.length} מסמכים.`);
+    });
 
     function renderDaysSelector(selectedDays = []) {
       const wrap = document.getElementById("daysContainer");
