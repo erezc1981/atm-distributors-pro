@@ -129,6 +129,13 @@
       margin-right: auto;
     }
 
+    #searchInput {
+      flex: 0 1 180px;
+      min-width: 140px;
+      padding: 6px 10px;
+      color: #111827;
+    }
+
     .container {
       max-width: 1120px;
       margin: 20px auto;
@@ -542,7 +549,7 @@
       </div>
 
       <div class="toolbar">
-        <input id="searchInput" type="search" placeholder="חיפוש מסוף / מספר..." style="width:160px;padding:6px 10px;color:#111827;" />
+        <input id="searchInput" type="search" placeholder="חיפוש מסוף / מספר..." />
         <button id="refreshBtn" type="button">🔄 רענן</button>
         <button id="toggleRouteBtn" type="button">📅 ימי קו</button>
         <button id="toggleCasBtn" type="button">🏦 כספונט</button>
@@ -721,7 +728,8 @@
         return;
       }
 
-      const fallbackTrialEnd = (Number(profile.createdAt) || now) + TRIAL_DAYS_DEFAULT * 24 * 60 * 60 * 1000;
+      const createdAtMs = Number(profile.createdAt) || now;
+      const fallbackTrialEnd = createdAtMs + TRIAL_DAYS_DEFAULT * 24 * 60 * 60 * 1000;
       const trialEndMs = Number(profile.trialEndsAt) || fallbackTrialEnd;
       const diffMs = trialEndMs - now;
       const daysLeft = Math.max(0, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
@@ -1008,7 +1016,10 @@
 
       const casDocRef = db.collection("distributors").doc(uid).collection("settings").doc("cas_sync");
       const snap = await casDocRef.get();
-      if (!snap.exists) return;
+      if (!snap.exists) {
+        document.getElementById("casSyncStatus").textContent = "טרם הוגדרו פרטי כספונט. פתח את 'כספונט' להזנת פרטים.";
+        return;
+      }
       const data = snap.data() || {};
       if (data.username && data.password) {
         await casDocRef.set({
