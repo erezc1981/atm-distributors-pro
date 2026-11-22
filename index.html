@@ -528,6 +528,7 @@
       border: 1px solid var(--border);
       background: #fff;
       color: var(--text);
+      touch-action: manipulation;
     }
 
     .btn-primary {
@@ -1042,9 +1043,8 @@
 
             <button
               type="button"
-              id="refill-btn-${id}"
+              data-refill-id="${id}"
               style="position:relative;z-index:2;"
-              onclick="markRefilled('${id}')"
             >סמן הטענה</button>
           </div>
         </div>
@@ -1197,12 +1197,6 @@
     window.markRefilled = async function (terminalId) {
       if (!currentUser) return;
       const t = currentTerminals.find((x) => String(x.id) === String(terminalId));
-      const btn = document.getElementById(`refill-btn-${terminalId}`);
-      if (btn) {
-        btn.disabled = true;
-        btn.textContent = "⏳ מעדכן...";
-      }
-
       try {
         const targetK = t ? getEffectiveTargetK(t) : null;
         const payload = { lastRefilledAt: Date.now() };
@@ -1216,23 +1210,19 @@
           .collection("terminals")
           .doc(String(terminalId))
           .set(payload, { merge: true });
-
-        if (btn) {
-          btn.textContent = "✓ הוטען";
-          setTimeout(() => {
-            btn.disabled = false;
-            btn.textContent = "סמן הטענה";
-          }, 1200);
-        }
       } catch (err) {
         console.error("markRefilled failed:", err);
         alert("שגיאה בעדכון הטענה: " + (err.message || err));
-        if (btn) {
-          btn.disabled = false;
-          btn.textContent = "סמן הטענה";
-        }
       }
     };
+
+    document.getElementById("terminalsList").addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-refill-id]");
+      if (!btn) return;
+      const terminalId = btn.getAttribute("data-refill-id");
+      if (!terminalId) return;
+      window.markRefilled(terminalId);
+    });
 
     document.querySelectorAll(".chip-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
