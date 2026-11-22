@@ -531,6 +531,13 @@
       touch-action: manipulation;
     }
 
+    button.refilled-active {
+      background: var(--success-soft);
+      border-color: var(--success-border);
+      color: var(--success);
+      font-weight: 800;
+    }
+
     .btn-primary {
       background: var(--primary);
       border-color: var(--primary);
@@ -963,6 +970,7 @@
           : "sector-none";
 
       const paperNeeded = Boolean(t.paperRollNeeded);
+      const isRefilled = Boolean(t.refilled);
       const noteText = String(t.notes ?? "").trim();
       const targetDisplayText = hasTarget ? `${targetK}K` : "—";
 
@@ -1044,8 +1052,10 @@
             <button
               type="button"
               data-refill-id="${id}"
+              class="${isRefilled ? "refilled-active" : ""}"
+              title="${isRefilled ? "לחץ לביטול סימון הטענה" : "לחץ לסימון הטענה"}"
               style="position:relative;z-index:2;"
-            >סמן הטענה</button>
+            >${isRefilled ? "✓ הוטען (בטל)" : "סמן הטענה"}</button>
           </div>
         </div>
       `;
@@ -1197,11 +1207,30 @@
     window.markRefilled = async function (terminalId) {
       if (!currentUser) return;
       const t = currentTerminals.find((x) => String(x.id) === String(terminalId));
+      if (!t) return;
+
       try {
-        const targetK = t ? getEffectiveTargetK(t) : null;
-        const payload = { lastRefilledAt: Date.now() };
-        if (targetK !== null && Number.isFinite(Number(targetK)) && Number(targetK) > 0) {
-          payload.balance = Math.round(Number(targetK) * 1000);
+        const currentlyRefilled = Boolean(t.refilled);
+        const payload = {};
+
+        if (currentlyRefilled) {
+          payload.refilled = false;
+          if (
+            t.previousBalanceBeforeRefill !== null &&
+            t.previousBalanceBeforeRefill !== undefined &&
+            Number.isFinite(Number(t.previousBalanceBeforeRefill))
+          ) {
+            payload.balance = Number(t.previousBalanceBeforeRefill);
+          }
+        } else {
+          const currentBal = Number(t.balance ?? 0);
+          const targetK = getEffectiveTargetK(t);
+          payload.refilled = true;
+          payload.previousBalanceBeforeRefill = currentBal;
+          payload.lastRefilledAt = Date.now();
+          if (targetK !== null && Number.isFinite(Number(targetK)) && Number(targetK) > 0) {
+            payload.balance = Math.round(Number(targetK) * 1000);
+          }
         }
 
         await db
