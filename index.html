@@ -216,17 +216,51 @@
       flex-wrap: wrap;
       align-items: center;
       gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px dashed #e5e7eb;
+    }
+
+    .rule-row:last-child {
+      padding-bottom: 0;
+      border-bottom: none;
     }
 
     .rule-group-label {
       font-size: 0.85rem;
-      font-weight: 700;
+      font-weight: 800;
       color: #374151;
-      min-width: 105px;
+      min-width: 125px;
+    }
+
+    @media (max-width: 640px) {
+      .rule-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+      }
+
+      .rule-group-label {
+        min-width: 0;
+        width: 100%;
+      }
+
+      .rule-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        width: 100%;
+      }
+    }
+
+    .rule-chips {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
     }
 
     .chip-btn {
-      padding: 5px 12px;
+      padding: 6px 12px;
       border-radius: 999px;
       font-size: 0.82rem;
       font-weight: 700;
@@ -685,25 +719,37 @@
       <section class="rules-bar">
         <div class="rule-row">
           <span class="rule-group-label">יום הטענה:</span>
-          <button type="button" class="chip-btn active" data-rule-group="refillDay" data-rule-val="midweek">ראשון / שלישי (יומיים)</button>
-          <button type="button" class="chip-btn" data-rule-group="refillDay" data-rule-val="thursday">חמישי (סופ"ש)</button>
+          <div class="rule-chips">
+            <button type="button" class="chip-btn active" data-rule-group="refillDay" data-rule-val="midweek">ראשון / שלישי (יומיים)</button>
+            <button type="button" class="chip-btn" data-rule-group="refillDay" data-rule-val="thursday">חמישי (סופ"ש)</button>
+          </div>
+        </div>
 
-          <span class="rule-group-label" style="margin-right:14px;">תקופה בחודש:</span>
-          <button type="button" class="chip-btn active" data-rule-group="monthPeriod" data-rule-val="regular">רגיל</button>
-          <button type="button" class="chip-btn" data-rule-group="monthPeriod" data-rule-val="salaries">משכורות (8–12)</button>
-          <button type="button" class="chip-btn" data-rule-group="monthPeriod" data-rule-val="allowances">קצבאות (26–29)</button>
+        <div class="rule-row">
+          <span class="rule-group-label">תקופה בחודש:</span>
+          <div class="rule-chips">
+            <button type="button" class="chip-btn active" data-rule-group="monthPeriod" data-rule-val="regular">רגיל</button>
+            <button type="button" class="chip-btn" data-rule-group="monthPeriod" data-rule-val="salaries">משכורות (8–12)</button>
+            <button type="button" class="chip-btn" data-rule-group="monthPeriod" data-rule-val="allowances">קצבאות (26–29)</button>
+          </div>
         </div>
 
         <div class="rule-row">
           <span id="jewishCountLabel" class="rule-group-label">מגזר יהודי (0):</span>
-          <button type="button" class="chip-btn active" data-rule-group="jewishMode" data-rule-val="regular">רגיל</button>
-          <button type="button" class="chip-btn" data-rule-group="jewishMode" data-rule-val="eve_holiday">ערב חג (+35%)</button>
-          <button type="button" class="chip-btn" data-rule-group="jewishMode" data-rule-val="holiday">חג (-75%)</button>
+          <div class="rule-chips">
+            <button type="button" class="chip-btn active" data-rule-group="jewishMode" data-rule-val="regular">רגיל</button>
+            <button type="button" class="chip-btn" data-rule-group="jewishMode" data-rule-val="eve_holiday">ערב חג (+35%)</button>
+            <button type="button" class="chip-btn" data-rule-group="jewishMode" data-rule-val="holiday">חג (-75%)</button>
+          </div>
+        </div>
 
-          <span id="arabCountLabel" class="rule-group-label" style="margin-right:14px;">מגזר ערבי (0):</span>
-          <button type="button" class="chip-btn active" data-rule-group="arabMode" data-rule-val="regular">רגיל</button>
-          <button type="button" class="chip-btn" data-rule-group="arabMode" data-rule-val="eve_eid">ערב חג / עיד (+35%)</button>
-          <button type="button" class="chip-btn" data-rule-group="arabMode" data-rule-val="ramadan">רמדאן (+15%)</button>
+        <div class="rule-row">
+          <span id="arabCountLabel" class="rule-group-label">מגזר ערבי (0):</span>
+          <div class="rule-chips">
+            <button type="button" class="chip-btn active" data-rule-group="arabMode" data-rule-val="regular">רגיל</button>
+            <button type="button" class="chip-btn" data-rule-group="arabMode" data-rule-val="eve_eid">ערב חג / עיד (+35%)</button>
+            <button type="button" class="chip-btn" data-rule-group="arabMode" data-rule-val="ramadan">רמדאן (+15%)</button>
+          </div>
         </div>
       </section>
 
