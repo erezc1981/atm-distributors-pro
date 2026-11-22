@@ -1166,11 +1166,8 @@
       });
     });
 
-    async function triggerCasSync(uid, force = false) {
-      const sessionKey = `atm_pro_login_sync_${uid}`;
-      if (!force && sessionStorage.getItem(sessionKey)) return;
-      sessionStorage.setItem(sessionKey, "1");
-
+    async function triggerCasSync(uid) {
+      if (!uid) return;
       const casDocRef = db.collection("distributors").doc(uid).collection("settings").doc("cas_sync");
       const snap = await casDocRef.get();
       if (!snap.exists) {
@@ -1181,7 +1178,8 @@
       if (data.username && data.password) {
         await casDocRef.set({
           syncRequested: true,
-          syncRequestedAt: Date.now()
+          syncRequestedAt: Date.now(),
+          lastSyncError: ""
         }, { merge: true });
       }
     }
@@ -1216,8 +1214,8 @@
           document.getElementById("casUserInput").value = data.username;
         }
         if (data.syncRequested) {
-          statusEl.textContent = "בקשת סנכרון מכספונט פעילה — ממתין לסקריפט הסנכרון...";
-          pillEl.textContent = "מסנכרן...";
+          statusEl.textContent = "בקשת סנכרון מכספונט פעילה — מסנכרן כעת מול כספונט...";
+          pillEl.textContent = "מסנכרן כעת...";
         } else if (data.lastSyncError) {
           statusEl.textContent = `שגיאת סנכרון: ${data.lastSyncError}`;
           pillEl.textContent = "שגיאת סנכרון";
@@ -1283,7 +1281,7 @@
       try {
         if (currentUser) {
           bindUserListeners(currentUser.uid);
-          await triggerCasSync(currentUser.uid, true);
+          await triggerCasSync(currentUser.uid);
         }
       } finally {
         setTimeout(() => {
@@ -1323,9 +1321,6 @@
     });
 
     document.getElementById("logoutBtn").addEventListener("click", () => {
-      if (currentUser) {
-        sessionStorage.removeItem(`atm_pro_login_sync_${currentUser.uid}`);
-      }
       auth.signOut();
     });
 
@@ -1360,6 +1355,7 @@
         username,
         password,
         syncRequested: true,
+        syncRequestedAt: Date.now(),
         updatedAt: Date.now()
       }, { merge: true });
     });
@@ -1401,7 +1397,7 @@
         document.getElementById("userEmailBadge").textContent = user.email || "";
         bindUserListeners(user.uid);
         try {
-          await triggerCasSync(user.uid, false);
+          await triggerCasSync(user.uid);
         } catch (err) {
           console.error("Failed to trigger login sync:", err);
         }
