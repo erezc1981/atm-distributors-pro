@@ -365,8 +365,26 @@
     }
 
     .terminal-meta {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px;
       font-size: 0.85rem;
       color: var(--muted);
+    }
+
+    .inline-mini-edit {
+      background: transparent;
+      border: none;
+      padding: 0 3px;
+      cursor: pointer;
+      font-size: 0.82rem;
+      line-height: 1;
+      border-radius: 5px;
+    }
+
+    .inline-mini-edit:hover {
+      background: rgba(0, 0, 0, 0.08);
     }
 
     .note-line {
@@ -808,7 +826,7 @@
 
     function getTerminalThreshold(t) {
       const parsed = Number(t.threshold);
-      return Number.isFinite(parsed) && parsed > 0 ? parsed : 3000;
+      return Number.isFinite(parsed) && parsed >= 0 ? parsed : 3000;
     }
 
     function getTerminalSector(t) {
@@ -930,7 +948,18 @@
                   onclick="togglePaperRoll('${id}')"
                 >🧻 נייר${paperNeeded ? " — להחלפה" : ""}</button>
               </div>
-              <div class="terminal-meta">מזהה: ${id} • סף התראה: ₪${threshold}</div>
+              <div class="terminal-meta">
+                <span>מזהה: ${id}</span>
+                <span>•</span>
+                <span>סף התראה: ₪${threshold}</span>
+                <button
+                  type="button"
+                  class="inline-mini-edit"
+                  title="ערוך סף התראה (₪)"
+                  aria-label="ערוך סף התראה"
+                  onclick="editTerminalThreshold('${id}')"
+                >✏️</button>
+              </div>
               <div class="note-line">
                 <span class="note-label">הערות:</span>
                 <button
@@ -1052,6 +1081,26 @@
         .collection("terminals")
         .doc(String(terminalId))
         .set({ paperRollNeeded: nextState }, { merge: true });
+    };
+
+    window.editTerminalThreshold = async function (terminalId) {
+      if (!currentUser) return;
+      const t = currentTerminals.find((x) => String(x.id) === String(terminalId));
+      const currentThresh = getTerminalThreshold(t || {});
+      const input = prompt(`הזן סף התראה בשקלים (₪) למסוף ${t?.name || terminalId} (${terminalId}):`, String(currentThresh));
+      if (input === null) return;
+      const cleaned = input.replace(/,/g, "").replace(/₪/g, "").trim();
+      const parsed = Number(cleaned);
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        alert("יש להזין סכום תקין בשקלים");
+        return;
+      }
+      await db
+        .collection("distributors")
+        .doc(currentUser.uid)
+        .collection("terminals")
+        .doc(String(terminalId))
+        .set({ threshold: Math.round(parsed) }, { merge: true });
     };
 
     window.editTerminalNote = async function (terminalId) {
