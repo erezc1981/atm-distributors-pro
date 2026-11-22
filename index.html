@@ -851,7 +851,6 @@
       return roundedTo5k > 0 ? roundedTo5k : 5000;
     }
 
-    // כמות חבילות 5K מדויקת ללא עיגול לזוגות
     function calcExactPacks5k(loadAmountILS) {
       const amount = Math.max(0, Number(loadAmountILS ?? 0));
       if (amount === 0) return 0;
