@@ -19,6 +19,9 @@
       --success-soft: #f0fdf4;
       --success-border: #bbf7d0;
       --success: #15803d;
+      --warn-soft: #fef3c7;
+      --warn-border: #f59e0b;
+      --warn-text: #92400e;
       --border: #e5e7eb;
     }
 
@@ -277,7 +280,7 @@
 
     .terminal-right {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       gap: 12px;
     }
 
@@ -293,12 +296,13 @@
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
+      margin-top: 2px;
     }
 
     .terminal-header {
       display: flex;
       flex-direction: column;
-      gap: 3px;
+      gap: 4px;
     }
 
     .title-line {
@@ -340,9 +344,58 @@
       border-color: #d1d5db;
     }
 
+    .paper-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 9px;
+      border-radius: 999px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      border: 1px solid #d1d5db;
+      background: #f9fafb;
+      color: #374151;
+      cursor: pointer;
+    }
+
+    .paper-btn.needed {
+      background: var(--warn-soft);
+      border-color: var(--warn-border);
+      color: var(--warn-text);
+    }
+
     .terminal-meta {
       font-size: 0.85rem;
       color: var(--muted);
+    }
+
+    .note-line {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.82rem;
+      color: #374151;
+      margin-top: 1px;
+    }
+
+    .note-label {
+      font-weight: 700;
+      color: #4b5563;
+    }
+
+    .note-edit-trigger {
+      background: transparent;
+      border: 1px dashed #cbd5e1;
+      border-radius: 6px;
+      padding: 2px 8px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: #374151;
+    }
+
+    .note-edit-trigger:hover {
+      background: #f8fafc;
+      border-color: #94a3b8;
     }
 
     .terminal-left {
@@ -393,8 +446,8 @@
     .fill-display {
       padding: 6px 14px;
       border-radius: 8px;
-      font-weight: 700;
-      font-size: 0.9rem;
+      font-weight: 800;
+      font-size: 0.92rem;
       background: var(--primary-soft);
       border: 1px solid #93c5fd;
       color: var(--primary);
@@ -595,13 +648,13 @@
       <section class="stats-sub">
         <div class="stat-box">
           <div class="stat-label">נותר להטעין במסלול</div>
-          <div id="statToLoad" class="stat-value" style="color:#1d4ed8;">₪0</div>
+          <div id="statToLoad" class="stat-value" style="color:#1d4ed8;">0K</div>
           <div id="statStationsToFill" class="stat-sub">0 תחנות למילוי</div>
         </div>
         <div class="stat-box">
-          <div class="stat-label">חבילות 5k מהבנק</div>
+          <div class="stat-label">חבילות 5K מהבנק</div>
           <div id="statPacks5k" class="stat-value" style="color:#15803d;">0</div>
-          <div class="stat-sub">כולל עיגול לזוגות</div>
+          <div class="stat-sub">כמות חבילות מדויקת</div>
         </div>
         <div class="stat-box">
           <div class="stat-label">התראות יתרה נמוכה</div>
@@ -715,6 +768,14 @@
       return Number.isFinite(num) ? num.toLocaleString("he-IL") : "0";
     }
 
+    function formatAmountK(val) {
+      const num = Number(val ?? 0);
+      if (!Number.isFinite(num) || num <= 0) return "0K";
+      const kVal = num / 1000;
+      const formattedK = Number.isInteger(kVal) ? String(kVal) : kVal.toFixed(1).replace(/\.0$/, "");
+      return `${formattedK}K`;
+    }
+
     function updateTrialPill(profile = {}) {
       const pill = document.getElementById("trialDaysPill");
       const summary = document.getElementById("payTrialSummary");
@@ -790,9 +851,12 @@
       return roundedTo5k > 0 ? roundedTo5k : 5000;
     }
 
-    function calcPacks5k(loadAmountILS) {
-      const rawPacks = Math.round(Number(loadAmountILS ?? 0) / 5000);
-      return rawPacks > 0 && rawPacks % 2 === 1 ? rawPacks + 1 : rawPacks;
+    // כמות חבילות 5K מדויקת ללא עיגול לזוגות
+    function calcExactPacks5k(loadAmountILS) {
+      const amount = Math.max(0, Number(loadAmountILS ?? 0));
+      if (amount === 0) return 0;
+      const packs = amount / 5000;
+      return Number.isInteger(packs) ? packs : Number(packs.toFixed(1));
     }
 
     function renderDaysSelector(selectedDays = []) {
@@ -834,13 +898,15 @@
           ? "sector-jewish"
           : "sector-none";
 
-      const targetDisplayText = hasTarget ? `${targetK}k` : "—";
+      const paperNeeded = Boolean(t.paperRollNeeded);
+      const noteText = String(t.notes ?? "").trim();
+      const targetDisplayText = hasTarget ? `${targetK}K` : "—";
 
       let fillDisplayHtml;
       if (!hasTarget) {
         fillDisplayHtml = `<span class="fill-display empty-target">יעד לא הוגדר</span>`;
       } else if (loadAmount > 0) {
-        fillDisplayHtml = `<span class="fill-display">למלא ₪${formatAmountILS(loadAmount)}</span>`;
+        fillDisplayHtml = `<span class="fill-display">למלא ${formatAmountK(loadAmount)}</span>`;
       } else {
         fillDisplayHtml = `<span class="fill-display ok-badge">תקין (0)</span>`;
       }
@@ -858,8 +924,23 @@
                   title="לחץ להחלפת מגזר (יהודי / ערבי / ללא מגזר)"
                   onclick="toggleTerminalSector('${id}')"
                 >${sectorLabel}</button>
+                <button
+                  type="button"
+                  class="paper-btn ${paperNeeded ? "needed" : ""}"
+                  title="${paperNeeded ? "מסומן שנגמר גליל קבלות - לחץ לביטול" : "סמן שנגמר גליל קבלות וצריך להחליף"}"
+                  onclick="togglePaperRoll('${id}')"
+                >🧻 נייר${paperNeeded ? " — להחלפה" : ""}</button>
               </div>
               <div class="terminal-meta">מזהה: ${id} • סף התראה: ₪${threshold}</div>
+              <div class="note-line">
+                <span class="note-label">הערות:</span>
+                <button
+                  type="button"
+                  class="note-edit-trigger"
+                  title="לחץ להוספה או עריכת הערה למסוף"
+                  onclick="editTerminalNote('${id}')"
+                >${noteText || "הוסף הערה..."}</button>
+              </div>
             </div>
           </div>
 
@@ -905,7 +986,8 @@
         ? terminals.filter(
             (t) =>
               String(t.name || "").toLowerCase().includes(q) ||
-              String(t.id || "").toLowerCase().includes(q)
+              String(t.id || "").toLowerCase().includes(q) ||
+              String(t.notes || "").toLowerCase().includes(q)
           )
         : terminals;
 
@@ -920,7 +1002,7 @@
       const loads = filtered.map((t) => calcLoadAmountILS(t.balance, getEffectiveTargetK(t)));
       const totalToLoad = loads.reduce((acc, v) => acc + v, 0);
       const stationsToFill = loads.filter((v) => v > 0).length;
-      const totalPacks5k = calcPacks5k(totalToLoad);
+      const totalPacks5k = calcExactPacks5k(totalToLoad);
       const alertTerminals = filtered.filter((t) => Number(t.balance ?? 0) <= getTerminalThreshold(t));
 
       const bannerEl = document.getElementById("alertBanner");
@@ -936,7 +1018,7 @@
 
       document.getElementById("statCount").textContent = String(filtered.length);
       document.getElementById("statBalance").textContent = `₪${formatAmountILS(totalBalance)}`;
-      document.getElementById("statToLoad").textContent = `₪${formatAmountILS(totalToLoad)}`;
+      document.getElementById("statToLoad").textContent = formatAmountK(totalToLoad);
       document.getElementById("statStationsToFill").textContent = `${stationsToFill} תחנות למילוי`;
       document.getElementById("statPacks5k").textContent = String(totalPacks5k);
       document.getElementById("statAlerts").textContent = String(alertTerminals.length);
@@ -958,6 +1040,33 @@
         .collection("terminals")
         .doc(String(terminalId))
         .set({ sector: nextSector }, { merge: true });
+    };
+
+    window.togglePaperRoll = async function (terminalId) {
+      if (!currentUser) return;
+      const t = currentTerminals.find((x) => String(x.id) === String(terminalId));
+      if (!t) return;
+      const nextState = !Boolean(t.paperRollNeeded);
+      await db
+        .collection("distributors")
+        .doc(currentUser.uid)
+        .collection("terminals")
+        .doc(String(terminalId))
+        .set({ paperRollNeeded: nextState }, { merge: true });
+    };
+
+    window.editTerminalNote = async function (terminalId) {
+      if (!currentUser) return;
+      const t = currentTerminals.find((x) => String(x.id) === String(terminalId));
+      const initialNote = String(t?.notes ?? "");
+      const input = prompt(`הערות למסוף ${t?.name || terminalId} (${terminalId}):`, initialNote);
+      if (input === null) return;
+      await db
+        .collection("distributors")
+        .doc(currentUser.uid)
+        .collection("terminals")
+        .doc(String(terminalId))
+        .set({ notes: input.trim() }, { merge: true });
     };
 
     window.openEditTargetModal = async function (terminalId) {
@@ -1212,20 +1321,22 @@
         (acc, t) => acc + calcLoadAmountILS(t.balance, getEffectiveTargetK(t)),
         0
       );
-      const totalPacks5k = calcPacks5k(totalToLoad);
+      const totalPacks5k = calcExactPacks5k(totalToLoad);
       const lines = [
         "*דוח מצב מסופים*",
-        `סה"כ להטענה: ₪${formatAmountILS(totalToLoad)} | חבילות 5k מהבנק: ${totalPacks5k}`,
+        `סה"כ להטענה: ${formatAmountK(totalToLoad)} | חבילות 5K מהבנק: ${totalPacks5k}`,
         ""
       ];
       currentTerminals.forEach((t, idx) => {
         const targetK = getEffectiveTargetK(t);
         const loadAmt = calcLoadAmountILS(t.balance, targetK);
-        const targetLabel = targetK !== null ? `${targetK}k` : "לא הוגדר";
+        const targetLabel = targetK !== null ? `${targetK}K` : "לא הוגדר";
         const statusText = targetK === null
           ? "יעד לא הוגדר"
-          : (loadAmt > 0 ? `למלא ₪${formatAmountILS(loadAmt)}` : "תקין (0)");
-        lines.push(`${idx + 1}. ${t.name} (${t.id}): במחסנית ₪${formatAmountILS(t.balance)} | יעד ${targetLabel} | ${statusText}`);
+          : (loadAmt > 0 ? `למלא ${formatAmountK(loadAmt)}` : "תקין (0)");
+        const paperPart = t.paperRollNeeded ? " | 🧻 נייר להחלפה" : "";
+        const notePart = t.notes ? ` | הערות: ${t.notes}` : "";
+        lines.push(`${idx + 1}. ${t.name} (${t.id}): במחסנית ₪${formatAmountILS(t.balance)} | יעד ${targetLabel} | ${statusText}${paperPart}${notePart}`);
       });
       const url = `https://wa.me/?text=${encodeURIComponent(lines.join("\n"))}`;
       window.open(url, "_blank");
