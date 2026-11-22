@@ -666,7 +666,7 @@
       <section class="stats-sub">
         <div class="stat-box">
           <div class="stat-label">נותר להטעין במסלול</div>
-          <div id="statToLoad" class="stat-value" style="color:#1d4ed8;">0K</div>
+          <div id="statToLoad" class="stat-value" style="color:#1d4ed8;">₪0</div>
           <div id="statStationsToFill" class="stat-sub">0 תחנות למילוי</div>
         </div>
         <div class="stat-box">
@@ -1046,7 +1046,7 @@
 
       document.getElementById("statCount").textContent = String(filtered.length);
       document.getElementById("statBalance").textContent = `₪${formatAmountILS(totalBalance)}`;
-      document.getElementById("statToLoad").textContent = formatAmountK(totalToLoad);
+      document.getElementById("statToLoad").textContent = `₪${formatAmountILS(totalToLoad)}`;
       document.getElementById("statStationsToFill").textContent = `${stationsToFill} תחנות למילוי`;
       document.getElementById("statPacks5k").textContent = String(totalPacks5k);
       document.getElementById("statAlerts").textContent = String(alertTerminals.length);
@@ -1368,7 +1368,7 @@
       const totalPacks5k = calcExactPacks5k(totalToLoad);
       const lines = [
         "*דוח מצב מסופים*",
-        `סה"כ להטענה: ${formatAmountK(totalToLoad)} | חבילות 5K מהבנק: ${totalPacks5k}`,
+        `סה"כ להטענה: ₪${formatAmountILS(totalToLoad)} | חבילות 5K מהבנק: ${totalPacks5k}`,
         ""
       ];
       currentTerminals.forEach((t, idx) => {
