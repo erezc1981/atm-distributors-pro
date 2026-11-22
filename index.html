@@ -1042,6 +1042,8 @@
 
             <button
               type="button"
+              id="refill-btn-${id}"
+              style="position:relative;z-index:2;"
               onclick="markRefilled('${id}')"
             >סמן הטענה</button>
           </div>
@@ -1194,12 +1196,42 @@
 
     window.markRefilled = async function (terminalId) {
       if (!currentUser) return;
-      await db
-        .collection("distributors")
-        .doc(currentUser.uid)
-        .collection("terminals")
-        .doc(String(terminalId))
-        .set({ lastRefilledAt: Date.now() }, { merge: true });
+      const t = currentTerminals.find((x) => String(x.id) === String(terminalId));
+      const btn = document.getElementById(`refill-btn-${terminalId}`);
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = "⏳ מעדכן...";
+      }
+
+      try {
+        const targetK = t ? getEffectiveTargetK(t) : null;
+        const payload = { lastRefilledAt: Date.now() };
+        if (targetK !== null && Number.isFinite(Number(targetK)) && Number(targetK) > 0) {
+          payload.balance = Math.round(Number(targetK) * 1000);
+        }
+
+        await db
+          .collection("distributors")
+          .doc(currentUser.uid)
+          .collection("terminals")
+          .doc(String(terminalId))
+          .set(payload, { merge: true });
+
+        if (btn) {
+          btn.textContent = "✓ הוטען";
+          setTimeout(() => {
+            btn.disabled = false;
+            btn.textContent = "סמן הטענה";
+          }, 1200);
+        }
+      } catch (err) {
+        console.error("markRefilled failed:", err);
+        alert("שגיאה בעדכון הטענה: " + (err.message || err));
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = "סמן הטענה";
+        }
+      }
     };
 
     document.querySelectorAll(".chip-btn").forEach((btn) => {
