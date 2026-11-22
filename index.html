@@ -124,8 +124,9 @@
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      justify-content: flex-start;
+      justify-content: flex-end;
       gap: 8px;
+      margin-right: auto;
     }
 
     .container {
@@ -933,7 +934,6 @@
       document.getElementById("statAlerts").textContent = String(alertTerminals.length);
     }
 
-    // מעבר מחזורי: יהודי -> ערבי -> ללא מגזר -> יהודי
     window.toggleTerminalSector = async function (terminalId) {
       if (!currentUser) return;
       const t = currentTerminals.find((x) => String(x.id) === String(terminalId));
