@@ -1294,18 +1294,20 @@
       if (!uid) return;
       const casDocRef = db.collection("distributors").doc(uid).collection("settings").doc("cas_sync");
       const snap = await casDocRef.get();
-      if (!snap.exists) {
-        document.getElementById("casSyncStatus").textContent = "טרם הוגדרו פרטי כספונט. פתח את 'כספונט' להזנת פרטים.";
+      const statusEl = document.getElementById("casSyncStatus");
+
+      if (!snap.exists || !(snap.data() || {}).username) {
+        statusEl.textContent = "טרם הוגדרו פרטי כספונט. פתח את 'כספונט' להזנת פרטים.";
         return;
       }
-      const data = snap.data() || {};
-      if (data.username) {
-        await casDocRef.set({
-          syncRequested: true,
-          syncRequestedAt: Date.now(),
-          lastSyncError: ""
-        }, { merge: true });
-      }
+
+      await casDocRef.set({
+        syncRequested: false,
+        syncRequestedAt: Date.now(),
+        lastSyncError: ""
+      }, { merge: true });
+
+      statusEl.textContent = "הבקשה נרשמה. להפעלה מיידית של המשיכה מכספונט הרץ את ה-Workflow ב-GitHub Actions (או המתן להרצה המתוזמנת).";
     }
 
     function bindUserListeners(uid) {
@@ -1478,10 +1480,12 @@
       }
       await db.collection("distributors").doc(currentUser.uid).collection("settings").doc("cas_sync").set({
         username,
-        syncRequested: true,
+        syncRequested: false,
         syncRequestedAt: Date.now(),
         updatedAt: Date.now()
       }, { merge: true });
+
+      document.getElementById("casSyncStatus").textContent = "שם המשתמש נשמר. להפעלה מיידית של המשיכה מכספונט הרץ את ה-Workflow ב-GitHub Actions.";
     });
 
     document.getElementById("whatsappBtn").addEventListener("click", () => {
