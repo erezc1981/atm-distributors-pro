@@ -155,7 +155,7 @@
 
     .stats-top {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 14px;
       margin-bottom: 14px;
     }
@@ -716,6 +716,10 @@
           <div id="statBalance" class="stat-hero-val">₪0</div>
           <div class="stat-hero-lbl">במחסנית</div>
         </div>
+        <div class="stat-hero">
+          <div id="statTxMidnight" class="stat-hero-val">0</div>
+          <div class="stat-hero-lbl">עסקאות מחצות</div>
+        </div>
       </section>
 
       <!-- סיכום משנה -->
@@ -728,7 +732,6 @@
         <div class="stat-box">
           <div class="stat-label">חבילות 5K מהבנק</div>
           <div id="statPacks5k" class="stat-value" style="color:#15803d;">0</div>
-          <div class="stat-sub">כמות חבילות מדויקת</div>
         </div>
         <div class="stat-box">
           <div class="stat-label">התראות יתרה נמוכה</div>
@@ -871,6 +874,11 @@
       return `${formattedK}K`;
     }
 
+    function getTerminalTxMidnight(t) {
+      const n = Number(t?.txSinceMidnight ?? 0);
+      return Number.isFinite(n) && n >= 0 ? Math.round(n) : 0;
+    }
+
     function updateTrialPill(profile = {}) {
       const pill = document.getElementById("trialDaysPill");
       const summary = document.getElementById("payTrialSummary");
@@ -983,6 +991,7 @@
       const hasTarget = targetK !== null;
       const rawBalance = Number(t.balance ?? 0);
       const balanceFormatted = formatAmountILS(rawBalance);
+      const txMidnight = getTerminalTxMidnight(t);
       const loadAmount = hasTarget ? calcLoadAmountILS(rawBalance, targetK) : 0;
       const isAlert = rawBalance <= thresholdNum;
       const isDone = Boolean(t.refilled);
@@ -1069,6 +1078,11 @@
             </div>
 
             <div class="metric-col">
+              <span class="metric-label">עסקאות מחצות</span>
+              <span class="metric-val">${formatAmountILS(txMidnight)}</span>
+            </div>
+
+            <div class="metric-col">
               <span class="metric-label">יעד מילוי</span>
               <span class="target-inline">
                 <strong class="metric-val" id="target-val-${safeIdAttr}">${targetDisplayText}</strong>
@@ -1118,6 +1132,7 @@
       }
 
       const totalBalance = filtered.reduce((acc, t) => acc + Number(t.balance ?? 0), 0);
+      const totalTxMidnight = filtered.reduce((acc, t) => acc + getTerminalTxMidnight(t), 0);
       const loads = filtered.map((t) => (t.refilled ? 0 : calcLoadAmountILS(t.balance, getEffectiveTargetK(t))));
       const totalToLoad = loads.reduce((acc, v) => acc + v, 0);
       const stationsToFill = loads.filter((v) => v > 0).length;
@@ -1137,6 +1152,7 @@
 
       document.getElementById("statCount").textContent = String(filtered.length);
       document.getElementById("statBalance").textContent = `₪${formatAmountILS(totalBalance)}`;
+      document.getElementById("statTxMidnight").textContent = formatAmountILS(totalTxMidnight);
       document.getElementById("statToLoad").textContent = `₪${formatAmountILS(totalToLoad)}`;
       document.getElementById("statStationsToFill").textContent = `${stationsToFill} תחנות למילוי`;
       document.getElementById("statPacks5k").textContent = String(totalPacks5k);
@@ -1473,10 +1489,14 @@
         (acc, t) => acc + (t.refilled ? 0 : calcLoadAmountILS(t.balance, getEffectiveTargetK(t))),
         0
       );
+      const totalTxMidnight = currentTerminals.reduce(
+        (acc, t) => acc + getTerminalTxMidnight(t),
+        0
+      );
       const totalPacks5k = calcExactPacks5k(totalToLoad);
       const lines = [
         "*דוח מצב מסופים*",
-        `סה"כ להטענה: ₪${formatAmountILS(totalToLoad)} | חבילות 5K מהבנק: ${totalPacks5k}`,
+        `סה"כ להטענה: ₪${formatAmountILS(totalToLoad)} | חבילות 5K מהבנק: ${totalPacks5k} | עסקאות מחצות: ${formatAmountILS(totalTxMidnight)}`,
         ""
       ];
       currentTerminals.forEach((t, idx) => {
@@ -1490,7 +1510,7 @@
             : (loadAmt > 0 ? `למלא ${formatAmountK(loadAmt)}` : "תקין (0)"));
         const paperPart = t.paperRollNeeded ? " | 🧻 נייר להחלפה" : "";
         const notePart = t.notes ? ` | הערות: ${t.notes}` : "";
-        lines.push(`${idx + 1}. ${t.name} (${t.id}): במחסנית ₪${formatAmountILS(t.balance)} | יעד ${targetLabel} | ${statusText}${paperPart}${notePart}`);
+        lines.push(`${idx + 1}. ${t.name} (${t.id}): במחסנית ₪${formatAmountILS(t.balance)} | עסקאות מחצות: ${formatAmountILS(getTerminalTxMidnight(t))} | יעד ${targetLabel} | ${statusText}${paperPart}${notePart}`);
       });
       const url = `https://wa.me/?text=${encodeURIComponent(lines.join("\n"))}`;
       window.open(url, "_blank");
