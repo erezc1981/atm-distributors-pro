@@ -700,8 +700,7 @@
       <section id="casPanel" class="panel hidden">
         <strong>חיבור וסנכרון CASMobile (casmobile.co.il)</strong>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:10px 0;">
-          <input id="casUserInput" type="text" placeholder="שם משתמש בכספונט" />
-          <input id="casPassInput" type="password" placeholder="סיסמה בכספונט" />
+          <input id="casUserInput" type="text" placeholder="שם משתמש בכספונט" autocomplete="username" />
         </div>
         <button id="saveAndSyncCasBtn" type="button" class="btn-primary">שמור ובקש סנכרון מכספונט</button>
         <div id="casSyncStatus" class="status-note" style="margin-top:8px;"></div>
@@ -850,6 +849,15 @@
       arabMode: "regular"
     };
 
+    function escapeHtml(val) {
+      return String(val ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
     function formatAmountILS(val) {
       const num = Number(val ?? 0);
       return Number.isFinite(num) ? num.toLocaleString("he-IL") : "0";
@@ -869,14 +877,17 @@
       const status = profile.subscriptionStatus || "trial";
       const now = Date.now();
 
-      if (status === "active") {
+      if (status === "active" || profile.plan === "owner_free") {
         pill.className = "trial-pill active-plan";
         pill.textContent = "מנוי פעיל";
         summary.textContent = "המנוי שלך פעיל.";
         return;
       }
 
-      const createdAtMs = Number(profile.createdAt) || now;
+      const authCreatedMs = currentUser?.metadata?.creationTime
+        ? Date.parse(currentUser.metadata.creationTime)
+        : NaN;
+      const createdAtMs = Number(profile.createdAt) || (Number.isFinite(authCreatedMs) ? authCreatedMs : now);
       const fallbackTrialEnd = createdAtMs + TRIAL_DAYS_DEFAULT * 24 * 60 * 60 * 1000;
       const trialEndMs = Number(profile.trialEndsAt) || fallbackTrialEnd;
       const diffMs = trialEndMs - now;
@@ -949,7 +960,7 @@
       const wrap = document.getElementById("daysContainer");
       wrap.innerHTML = DAYS.map((day, idx) => {
         const checked = selectedDays.includes(idx) ? "checked" : "";
-        return `<label class="day-chip"><input type="checkbox" value="${idx}" ${checked} /> ${day}</label>`;
+        return `<label class="day-chip"><input type="checkbox" value="${idx}" ${checked} /> ${escapeHtml(day)}</label>`;
       }).join("");
     }
 
@@ -963,7 +974,9 @@
 
     function renderTerminalCard(t, index) {
       const id = String(t.id ?? "");
-      const name = String(t.name ?? `מסוף ${id}`);
+      const safeIdAttr = escapeHtml(id);
+      const safeIdText = escapeHtml(id);
+      const safeName = escapeHtml(t.name ?? `מסוף ${id}`);
       const thresholdNum = getTerminalThreshold(t);
       const threshold = formatAmountILS(thresholdNum);
       const targetK = getEffectiveTargetK(t);
@@ -987,6 +1000,7 @@
 
       const paperNeeded = Boolean(t.paperRollNeeded);
       const noteText = String(t.notes ?? "").trim();
+      const safeNoteText = escapeHtml(noteText);
       const targetDisplayText = hasTarget ? `${targetK}K` : "—";
 
       let fillDisplayHtml;
@@ -1005,27 +1019,27 @@
       ].filter(Boolean).join(" ");
 
       return `
-        <div class="${cardClasses}" data-terminal-id="${id}">
+        <div class="${cardClasses}" data-terminal-id="${safeIdAttr}">
           <div class="terminal-right">
             <span class="row-index">${index + 1}</span>
             <div class="terminal-header">
               <div class="title-line">
-                <span class="terminal-title">${name}</span>
+                <span class="terminal-title">${safeName}</span>
                 <button
                   type="button"
                   class="sector-badge ${sectorClass}"
                   title="לחץ להחלפת מגזר (יהודי / ערבי / ללא מגזר)"
-                  onclick="toggleTerminalSector('${id}')"
+                  onclick="toggleTerminalSector('${safeIdAttr}')"
                 >${sectorLabel}</button>
                 <button
                   type="button"
                   class="paper-btn ${paperNeeded ? "needed" : ""}"
                   title="${paperNeeded ? "מסומן שנגמר גליל קבלות - לחץ לביטול" : "סמן שנגמר גליל קבלות וצריך להחליף"}"
-                  onclick="togglePaperRoll('${id}')"
+                  onclick="togglePaperRoll('${safeIdAttr}')"
                 >🧻 נייר${paperNeeded ? " — להחלפה" : ""}</button>
               </div>
               <div class="terminal-meta">
-                <span>מזהה: ${id}</span>
+                <span>מזהה: ${safeIdText}</span>
                 <span>•</span>
                 <span>סף התראה: ₪${threshold}</span>
                 <button
@@ -1033,7 +1047,7 @@
                   class="inline-mini-edit"
                   title="ערוך סף התראה (₪)"
                   aria-label="ערוך סף התראה"
-                  onclick="editTerminalThreshold('${id}')"
+                  onclick="editTerminalThreshold('${safeIdAttr}')"
                 >✏️</button>
               </div>
               <div class="note-line">
@@ -1042,8 +1056,8 @@
                   type="button"
                   class="note-edit-trigger"
                   title="לחץ להוספה או עריכת הערה למסוף"
-                  onclick="editTerminalNote('${id}')"
-                >${noteText || "הוסף הערה..."}</button>
+                  onclick="editTerminalNote('${safeIdAttr}')"
+                >${safeNoteText || "הוסף הערה..."}</button>
               </div>
             </div>
           </div>
@@ -1057,13 +1071,13 @@
             <div class="metric-col">
               <span class="metric-label">יעד מילוי</span>
               <span class="target-inline">
-                <strong class="metric-val" id="target-val-${id}">${targetDisplayText}</strong>
+                <strong class="metric-val" id="target-val-${safeIdAttr}">${targetDisplayText}</strong>
                 <button
                   type="button"
                   class="icon-edit-btn"
                   title="הזן / ערוך יעד מילוי"
                   aria-label="הזן / ערוך יעד מילוי"
-                  onclick="openEditTargetModal('${id}')"
+                  onclick="openEditTargetModal('${safeIdAttr}')"
                 >✏️</button>
               </span>
             </div>
@@ -1073,7 +1087,7 @@
             <button
               type="button"
               class="check-btn ${isDone ? "checked" : ""}"
-              onclick="toggleCompleted('${id}')"
+              onclick="toggleCompleted('${safeIdAttr}')"
             >${isDone ? "הוטען ✓" : "סמן הטענה"}</button>
           </div>
         </div>
@@ -1113,7 +1127,7 @@
       const bannerEl = document.getElementById("alertBanner");
       if (alertTerminals.length > 0) {
         const itemsText = alertTerminals
-          .map((t) => `${t.name} (₪${formatAmountILS(t.balance)})`)
+          .map((t) => `${String(t.name ?? "")} (₪${formatAmountILS(t.balance)})`)
           .join(", ");
         bannerEl.textContent = `🚨 התראת יתרה נמוכה ב-${alertTerminals.length} מסופים: ${itemsText}`;
         bannerEl.classList.remove("hidden");
@@ -1246,7 +1260,7 @@
         console.error("toggleCompleted failed:", err);
         t.refilled = !nextDone;
         updateStatsAndList(currentTerminals);
-        alert("שגיאה בעדכון הטענה: " + (err.message || err));
+        alert("שגיאה בעדכון הטענה: " + (err && err.message ? err.message : String(err)));
       }
     };
 
@@ -1269,7 +1283,7 @@
         return;
       }
       const data = snap.data() || {};
-      if (data.username && data.password) {
+      if (data.username) {
         await casDocRef.set({
           syncRequested: true,
           syncRequestedAt: Date.now(),
@@ -1311,7 +1325,7 @@
           statusEl.textContent = "בקשת סנכרון מכספונט פעילה — מסנכרן כעת מול כספונט...";
           pillEl.textContent = "מסנכרן כעת...";
         } else if (data.lastSyncError) {
-          statusEl.textContent = `שגיאת סנכרון: ${data.lastSyncError}`;
+          statusEl.textContent = `שגיאת סנכרון: ${String(data.lastSyncError)}`;
           pillEl.textContent = "שגיאת סנכרון";
         } else if (data.lastSyncedAt) {
           const dt = new Date(Number(data.lastSyncedAt)).toLocaleString("he-IL");
@@ -1386,18 +1400,20 @@
     });
 
     document.getElementById("loginBtn").addEventListener("click", async () => {
-      document.getElementById("authError").textContent = "";
+      const errEl = document.getElementById("authError");
+      errEl.textContent = "";
       const email = document.getElementById("emailInput").value.trim();
       const pass = document.getElementById("passwordInput").value;
       try {
         await auth.signInWithEmailAndPassword(email, pass);
       } catch (err) {
-        document.getElementById("authError").textContent = err.message;
+        errEl.textContent = err && err.message ? err.message : "שגיאה בהתחברות";
       }
     });
 
     document.getElementById("registerBtn").addEventListener("click", async () => {
-      document.getElementById("authError").textContent = "";
+      const errEl = document.getElementById("authError");
+      errEl.textContent = "";
       const email = document.getElementById("emailInput").value.trim();
       const pass = document.getElementById("passwordInput").value;
       try {
@@ -1406,11 +1422,11 @@
         await db.collection("distributors").doc(cred.user.uid).set({
           email,
           subscriptionStatus: "trial",
-          trialEndsAt: now + TRIAL_DAYS_DEFAULT * 24 * 60 * 60 * 1000,
-          createdAt: now
+          createdAt: now,
+          trialEndsAt: now + TRIAL_DAYS_DEFAULT * 24 * 60 * 60 * 1000
         }, { merge: true });
       } catch (err) {
-        document.getElementById("authError").textContent = err.message;
+        errEl.textContent = err && err.message ? err.message : "שגיאה בהרשמה";
       }
     });
 
@@ -1440,14 +1456,12 @@
     document.getElementById("saveAndSyncCasBtn").addEventListener("click", async () => {
       if (!currentUser) return;
       const username = document.getElementById("casUserInput").value.trim();
-      const password = document.getElementById("casPassInput").value;
-      if (!username || !password) {
-        alert("יש להזין שם משתמש וסיסמה של כספונט");
+      if (!username) {
+        alert("יש להזין שם משתמש של כספונט");
         return;
       }
       await db.collection("distributors").doc(currentUser.uid).collection("settings").doc("cas_sync").set({
         username,
-        password,
         syncRequested: true,
         syncRequestedAt: Date.now(),
         updatedAt: Date.now()
