@@ -1499,18 +1499,13 @@
     renderDaysSelector([0, 2, 4]);
     syncRuleChipButtons();
 
-    auth.onAuthStateChanged(async (user) => {
+    auth.onAuthStateChanged((user) => {
       currentUser = user;
       if (user) {
         document.getElementById("authSection").classList.add("hidden");
         document.getElementById("appSection").classList.remove("hidden");
         document.getElementById("userEmailBadge").textContent = user.email || "";
         bindUserListeners(user.uid);
-        try {
-          await triggerCasSync(user.uid);
-        } catch (err) {
-          console.error("Failed to trigger login sync:", err);
-        }
       } else {
         if (unsubscribeTerminals) unsubscribeTerminals();
         if (unsubscribeCas) unsubscribeCas();
