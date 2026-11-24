@@ -107,10 +107,12 @@
     }
 
     /* ===== סרגל עליון ===== */
+    /* הסרגל העליון נשאר תמיד למעלה בגלילה */
     .appbar {
+      position: -webkit-sticky;
       position: sticky;
       top: 0;
-      z-index: 20;
+      z-index: 40;
       background: var(--navy);
       color: #fff;
       min-height: 58px;
@@ -124,6 +126,11 @@
     .appbar-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
     .appbar-title { font-weight: 800; font-size: 1.02rem; white-space: nowrap; }
     .appbar-sub { font-size: 0.78rem; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 62vw; }
+    /* בגלילה למטה: במקום "עודכן לפני..." מוצג תקציר קצר של כרטיס הסיכום */
+    .appbar-mini { display: none; font-size: 0.82rem; font-weight: 700; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 62vw; }
+    .appbar-mini b { color: #fff; font-weight: 900; }
+    .appbar.scrolled .appbar-mini { display: block; }
+    .appbar.scrolled #lastSyncPill { display: none; }
     .appbar-sub.sync-stale { color: #fcd34d; }
     .appbar-sub.sync-error { color: #fca5a5; }
     .appbar-actions { display: flex; align-items: center; gap: 6px; }
@@ -194,13 +201,15 @@
     .summary-foot {
       display: flex;
       flex-wrap: wrap;
-      gap: 2px 12px;
-      margin-top: 8px;
-      padding-top: 7px;
+      justify-content: space-between;
+      gap: 4px 12px;
+      margin-top: 9px;
+      padding-top: 8px;
       border-top: 1px solid rgba(255, 255, 255, 0.14);
-      font-size: 0.74rem;
+      font-size: 0.86rem;
       color: #cbd5e1;
     }
+    .summary-foot b { font-size: 1rem; font-weight: 800; }
 
     .hidden-toggle {
       width: 100%;
@@ -557,7 +566,7 @@
       .summary-label { font-size: 0.86rem; }
       .summary-side { padding: 8px 14px; }
       .summary-side-val { font-size: 1.5rem; }
-      .summary-foot { font-size: 0.84rem; }
+      .summary-foot { font-size: 0.9rem; }
       .summary-chips .chip { font-size: 0.8rem; padding: 3px 10px; }
       .summary-chips, .summary-foot { margin: 0; border: none; padding: 0; }
       .summary-foot { justify-content: flex-end; }
@@ -603,6 +612,22 @@
 
   <!-- מסך ניהול ראשי -->
   <div id="appSection" class="hidden">
+    <header class="appbar">
+      <div class="appbar-brand">
+        <span class="atm-tag">ATM</span>
+        <div>
+          <div class="appbar-title">ניהול קו כספומטים</div>
+          <div id="lastSyncPill" class="appbar-sub">ממתין לסנכרון...</div>
+          <div id="appbarMini" class="appbar-mini"></div>
+        </div>
+      </div>
+      <div class="appbar-actions">
+        <button id="refreshBtn" type="button" class="ghost-btn desk-only">🔄 רענן</button>
+        <button id="toggleReportsBtn" type="button" class="ghost-btn desk-only">📊 דוחות</button>
+        <button id="whatsappBtn" type="button" class="ghost-btn desk-only">💬 שלח לוואטסאפ</button>
+        <button type="button" class="menu-btn" data-open-sheet="moreSheet" aria-label="תפריט">☰<span class="desk-only"> תפריט</span></button>
+      </div>
+    </header>
     <div id="lockBanner" class="alert-banner hidden" style="background:#92400e;">🔒 תקופת הניסיון/המנוי הסתיימה — הנתונים מוצגים לקריאה בלבד. לחץ "שדרוג / תשלום" כדי להמשיך.</div>
     <div id="alertBanner" class="alert-banner hidden"></div>
     <div id="offlineBanner" class="alert-banner hidden" style="background:#475569;">📴 אין חיבור לאינטרנט — אפשר להמשיך לעבוד, השינויים יישמרו כשהחיבור יחזור.</div>
@@ -613,21 +638,6 @@
     </div>
     <div id="driverBanner" class="alert-banner hidden" style="background:#0f766e;"></div>
 
-    <header class="appbar">
-      <div class="appbar-brand">
-        <span class="atm-tag">ATM</span>
-        <div>
-          <div class="appbar-title">ניהול קו כספומטים</div>
-          <div id="lastSyncPill" class="appbar-sub">ממתין לסנכרון...</div>
-        </div>
-      </div>
-      <div class="appbar-actions">
-        <button id="refreshBtn" type="button" class="ghost-btn desk-only">🔄 רענן</button>
-        <button id="toggleReportsBtn" type="button" class="ghost-btn desk-only">📊 דוחות</button>
-        <button id="whatsappBtn" type="button" class="ghost-btn desk-only">💬 שלח לוואטסאפ</button>
-        <button type="button" class="menu-btn" data-open-sheet="moreSheet" aria-label="תפריט">☰<span class="desk-only"> תפריט</span></button>
-      </div>
-    </header>
 
     <!-- תפריט: הגדרות וחשבון -->
     <section id="moreSheet" class="panel sheet hidden" aria-label="תפריט">
@@ -1122,6 +1132,16 @@
     }
     setInterval(updateSyncPill, 60000);
 
+    // כשכרטיס הסיכום יוצא מהמסך בגלילה - הסרגל העליון מציג תקציר שלו
+    (function watchSummaryCard() {
+      const card = document.querySelector(".summary-card");
+      const bar = document.querySelector(".appbar");
+      if (!card || !bar || !("IntersectionObserver" in window)) return;
+      new IntersectionObserver(([entry]) => {
+        bar.classList.toggle("scrolled", !entry.isIntersecting && entry.boundingClientRect.top < 0);
+      }, { rootMargin: "-60px 0px 0px 0px", threshold: 0 }).observe(card);
+    })();
+
     let toastTimer = null;
     function showToast(msg) {
       const el = document.getElementById("toast");
@@ -1342,6 +1362,8 @@
       document.getElementById("statStationsToFill").textContent = `${stationsToFill} תחנות למילוי`;
       document.getElementById("statPacks5k").textContent = String(totalPacks5k);
       document.getElementById("statAlerts").textContent = String(alertTerminals.length);
+      document.getElementById("appbarMini").innerHTML =
+        `להטעין <b>₪${formatAmountILS(totalToLoad)}</b> · ${stationsToFill} תחנות${alertTerminals.length ? ` · 🚨 ${alertTerminals.length}` : ""}`;
     }
 
     window.toggleTerminalSector = async function (terminalId) {
