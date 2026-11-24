@@ -26,7 +26,10 @@
       --radius: 16px;
       --shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.04);
       --nav-h: 64px;
+      --appbar-h: 60px;
     }
+    /* מקום לסרגל העליון הקבוע */
+    #appSection { padding-top: calc(var(--appbar-h) + env(safe-area-inset-top)); }
 
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
@@ -109,14 +112,16 @@
     /* ===== סרגל עליון ===== */
     /* הסרגל העליון נשאר תמיד למעלה בגלילה */
     .appbar {
-      position: -webkit-sticky;
-      position: sticky;
+      position: fixed;
       top: 0;
+      left: 0;
+      right: 0;
+      height: calc(var(--appbar-h) + env(safe-area-inset-top));
       z-index: 40;
       background: var(--navy);
       color: #fff;
-      min-height: 58px;
-      padding: 8px 14px;
+      padding-top: env(safe-area-inset-top);
+      padding-inline: 14px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -210,6 +215,9 @@
       color: #cbd5e1;
     }
     .summary-foot b { font-size: 1rem; font-weight: 800; }
+
+    .wa-ico { width: 1.25em; height: 1.25em; vertical-align: -0.25em; display: inline-block; }
+    .bottom-nav .wa-ico { width: 24px; height: 24px; }
 
     .hidden-toggle {
       width: 100%;
@@ -583,7 +591,7 @@
       .desk-only { display: inline-flex !important; }
       span.desk-only { display: inline !important; }
       .bottom-nav { display: none; }
-      .appbar { padding: 10px 24px; }
+      .appbar { padding-inline: 24px; }
       .appbar-sub { max-width: none; }
       .container { padding: 20px 24px 32px; }
       .summary-card { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 24px; padding: 20px 24px; border-radius: 20px; }
@@ -649,7 +657,7 @@
       <div class="appbar-actions">
         <button id="refreshBtn" type="button" class="ghost-btn desk-only">🔄 רענן</button>
         <button id="toggleReportsBtn" type="button" class="ghost-btn desk-only">📊 דוחות</button>
-        <button id="whatsappBtn" type="button" class="ghost-btn desk-only">💬 שלח לוואטסאפ</button>
+        <button id="whatsappBtn" type="button" class="ghost-btn desk-only"><svg class="wa-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="#25D366" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2z"/><path fill="#fff" d="M8.6 7.2c.2-.4.4-.4.7-.4h.5c.2 0 .4 0 .6.5l.8 1.9c.1.2.1.4 0 .6l-.4.6c-.1.2-.2.3 0 .6.4.7 1 1.4 1.7 1.9.6.4 1 .6 1.3.7.2.1.4 0 .5-.1l.6-.8c.2-.2.4-.2.6-.1l1.8.9c.2.1.4.2.4.4 0 .5-.1 1.1-.5 1.5-.5.5-1.3.8-2 .8-1 0-2.6-.5-4.2-2-1.7-1.6-2.4-3.2-2.5-4.2 0-.8.3-1.4.6-1.8z"/></svg> שלח לוואטסאפ</button>
         <button type="button" class="menu-btn" data-open-sheet="moreSheet" aria-label="תפריט">☰<span class="desk-only"> תפריט</span></button>
       </div>
     </header>
@@ -767,13 +775,10 @@
             <div class="summary-label">נותר להטעין במסלול</div>
             <div id="statToLoad" class="summary-value">₪0</div>
           </div>
-          <div class="summary-side">
-            <div class="summary-side-val"><span id="statPacks5k">0</span></div>
-            <div class="summary-side-lbl">חבילות 5K</div>
-          </div>
         </div>
         <div class="summary-chips">
           <span class="chip chip-info" id="statStationsToFill">0 תחנות למילוי</span>
+          <span class="chip chip-info">📦 <b id="statPacks5k">0</b>&nbsp;חבילות 5K מהבנק</span>
           <span class="chip chip-danger">🚨 <b id="statAlerts">0</b> מתחת לסף</span>
         </div>
         <div class="summary-foot">
@@ -794,9 +799,9 @@
           <div class="rule-row">
             <span class="rule-group-label">יום הטענה</span>
             <div class="rule-chips">
-              <button type="button" class="chip-btn active" data-rule-group="refillDay" data-rule-val="midweek">ראשון / שלישי</button>
-              <button type="button" class="chip-btn" data-rule-group="refillDay" data-rule-val="thursday">חמישי (סופ"ש)</button>
+              <span id="refillDayChips" class="rule-chips"></span>
             </div>
+            <div id="rulesAutoNote" class="status-note" style="font-size:0.78rem;"></div>
           </div>
           <div class="rule-row">
             <span class="rule-group-label">תקופה בחודש</span>
@@ -832,7 +837,7 @@
       <button type="button" data-scroll-top><span>🏧</span>מסופים</button>
       <button type="button" data-proxy="toggleReportsBtn"><span>📊</span>דוחות</button>
       <button type="button" data-proxy="refreshBtn"><span>🔄</span>רענן</button>
-      <button type="button" data-proxy="whatsappBtn"><span>💬</span>שלח</button>
+      <button type="button" data-proxy="whatsappBtn"><span><svg class="wa-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="#25D366" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2z"/><path fill="#fff" d="M8.6 7.2c.2-.4.4-.4.7-.4h.5c.2 0 .4 0 .6.5l.8 1.9c.1.2.1.4 0 .6l-.4.6c-.1.2-.2.3 0 .6.4.7 1 1.4 1.7 1.9.6.4 1 .6 1.3.7.2.1.4 0 .5-.1l.6-.8c.2-.2.4-.2.6-.1l1.8.9c.2.1.4.2.4.4 0 .5-.1 1.1-.5 1.5-.5.5-1.3.8-2 .8-1 0-2.6-.5-4.2-2-1.7-1.6-2.4-3.2-2.5-4.2 0-.8.3-1.4.6-1.8z"/></svg></span>וואטסאפ</button>
       <button type="button" data-open-sheet="moreSheet"><span>☰</span>עוד</button>
     </nav>
     <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
@@ -975,7 +980,7 @@
     }
 
     let activeRules = {
-      refillDay: "midweek",
+      refillDay: String(new Date().getDay()),
       monthPeriod: "regular",
       jewishMode: "regular",
       arabMode: "regular"
@@ -1081,7 +1086,7 @@
     function getEffectiveTargetK(t) {
       if (!hasConfiguredTargetK(t)) return null;
       const baseK = Number(t.baseTargetK);
-      const dayPct = Number(ADJUSTMENTS.refillDay?.[activeRules.refillDay] ?? 0);
+      const dayPct = refillDayPct(Number(activeRules.refillDay));
       const periodPct = Number(ADJUSTMENTS.monthPeriod?.[activeRules.monthPeriod] ?? 0);
       const sector = getTerminalSector(t);
       const sectorPct = sector === "arab"
@@ -1126,13 +1131,131 @@
         const v = btn.getAttribute("data-rule-val");
         const on = activeRules[grp] === v;
         btn.classList.toggle("active", on);
-        if (on && v !== "regular" && v !== "midweek") active.push(btn.textContent.trim());
+        if (on && grp !== "refillDay" && v !== "regular") active.push(btn.textContent.trim());
       });
+      const dayIdx = Number(activeRules.refillDay);
+      if (Number.isInteger(dayIdx) && dayIdx >= 0 && dayIdx <= 6) {
+        const pct = refillDayPct(dayIdx);
+        active.unshift(`ביקור ${DAYS[dayIdx]}${pct ? ` +${pct}%` : ""}`);
+      }
       // תקציר ההתאמות הפעילות בכותרת המקופלת
       const sum = document.getElementById("rulesSummary");
       if (sum) {
         sum.textContent = active.length ? active.join(" · ") : "רגיל";
-        sum.classList.toggle("rules-active", active.length > 0);
+        sum.classList.toggle("rules-active", active.some((a) => !a.startsWith("ביקור ") || a.includes("%")));
+      }
+    }
+
+    // ---------- התאמות חישוב אוטומטיות לפי תאריך הביקור ----------
+    // לוח חגים (תאריך -> מצב). תאריכי חגים מוסלמיים תלויים בראיית הירח (±יום) - אפשר לשנות ידנית.
+    const HOLIDAY_CALENDAR = {
+      jewish: {
+        // 2026
+        "2026-04-01": "eve_holiday", "2026-04-02": "holiday", "2026-04-07": "eve_holiday", "2026-04-08": "holiday",
+        "2026-05-21": "eve_holiday", "2026-05-22": "holiday",
+        "2026-09-11": "eve_holiday", "2026-09-12": "holiday", "2026-09-13": "holiday",
+        "2026-09-20": "eve_holiday", "2026-09-21": "holiday",
+        "2026-09-25": "eve_holiday", "2026-09-26": "holiday", "2026-10-02": "eve_holiday", "2026-10-03": "holiday",
+        // 2027
+        "2027-04-21": "eve_holiday", "2027-04-22": "holiday", "2027-04-27": "eve_holiday", "2027-04-28": "holiday",
+        "2027-06-10": "eve_holiday", "2027-06-11": "holiday",
+        "2027-10-01": "eve_holiday", "2027-10-02": "holiday", "2027-10-03": "holiday",
+        "2027-10-10": "eve_holiday", "2027-10-11": "holiday",
+        "2027-10-15": "eve_holiday", "2027-10-16": "holiday", "2027-10-22": "eve_holiday", "2027-10-23": "holiday"
+      },
+      arabEves: ["2027-03-09", "2027-05-15"],                       // ערב עיד אל-פיטר / עיד אל-אדחא
+      ramadan: [["2027-02-08", "2027-03-08"]]                         // טווחי רמדאן
+    };
+
+    // אחוז תוספת לפי כמה ימים הביקור צריך לכסות: עד יומיים - רגיל, כל יום נוסף +25% (כמו חמישי לסופ"ש)
+    function refillDayPct(dayIdx) {
+      if (!Number.isInteger(dayIdx) || !routeDays.includes(dayIdx)) return 0;
+      const days = [...new Set(routeDays)].sort((a, b) => a - b);
+      let cover = 7;
+      for (let i = 1; i <= 7; i++) if (days.includes((dayIdx + i) % 7)) { cover = i; break; }
+      return Math.max(0, cover - 2) * 25;
+    }
+
+    // התאריך הקרוב (כולל היום) שבו יוצא יום השבוע הזה
+    function visitDateFor(dayIdx) {
+      const d = new Date();
+      d.setHours(12, 0, 0, 0);
+      for (let i = 0; i < 7; i++) {
+        if (d.getDay() === dayIdx) return d;
+        d.setDate(d.getDate() + 1);
+      }
+      return d;
+    }
+
+    function autoRulesFor(dayIdx) {
+      const date = visitDateFor(dayIdx);
+      const iso = date.toLocaleDateString("en-CA");
+      const dom = date.getDate();
+      const inRamadan = HOLIDAY_CALENDAR.ramadan.some(([a, b]) => iso >= a && iso <= b);
+      return {
+        refillDay: String(dayIdx),
+        monthPeriod: dom >= 8 && dom <= 12 ? "salaries" : dom >= 26 && dom <= 29 ? "allowances" : "regular",
+        jewishMode: HOLIDAY_CALENDAR.jewish[iso] || "regular",
+        arabMode: HOLIDAY_CALENDAR.arabEves.includes(iso) ? "eve_eid" : inRamadan ? "ramadan" : "regular"
+      };
+    }
+
+    // יום הביקור הבא: היום אם הוא יום קו, אחרת יום הקו הבא
+    function nextVisitDay() {
+      const today = new Date().getDay();
+      for (let i = 0; i < 7; i++) if (routeDays.includes((today + i) % 7)) return (today + i) % 7;
+      return today;
+    }
+
+    let rulesOverride = null; // { date, refillDay, monthPeriod, jewishMode, arabMode }
+    let routeDays = [0, 2, 4];
+
+    function applyAutoRules() {
+      const day = nextVisitDay();
+      const auto = autoRulesFor(day);
+      const iso = visitDateFor(day).toLocaleDateString("en-CA");
+      const ov = rulesOverride && rulesOverride.date >= new Date().toLocaleDateString("en-CA") ? rulesOverride : null;
+      if (ov) {
+        activeRules = {
+          refillDay: String(ov.refillDay ?? auto.refillDay),
+          monthPeriod: ov.monthPeriod || auto.monthPeriod,
+          jewishMode: ov.jewishMode || auto.jewishMode,
+          arabMode: ov.arabMode || auto.arabMode
+        };
+      } else {
+        activeRules = auto;
+      }
+      const note = document.getElementById("rulesAutoNote");
+      if (note) {
+        const shownIso = visitDateFor(Number(activeRules.refillDay)).toLocaleDateString("he-IL");
+        note.textContent = ov
+          ? `נבחר ידנית לביקור ב-${shownIso}. בתאריך הבא החישוב יחזור להיות אוטומטי.`
+          : `נבחר אוטומטית לפי תאריך הביקור (${shownIso}): יום, תקופה בחודש וחגים.`;
+      }
+      syncRuleChipButtons();
+      updateStatsAndList(currentTerminals);
+    }
+
+    function renderRefillDayChips() {
+      const wrap = document.getElementById("refillDayChips");
+      if (!wrap) return;
+      const days = [...new Set(routeDays)].sort((a, b) => a - b);
+      wrap.innerHTML = days.map((d) => {
+        const pct = refillDayPct(d);
+        return `<button type="button" class="chip-btn" data-rule-group="refillDay" data-rule-val="${d}">${DAYS[d]}${pct ? ` +${pct}%` : ""}</button>`;
+      }).join("") || `<span class="status-note">לא הוגדרו ימי קו (תפריט ← ימי קו)</span>`;
+    }
+
+    async function saveRulesOverride() {
+      const iso = visitDateFor(Number(activeRules.refillDay)).toLocaleDateString("en-CA");
+      rulesOverride = { date: iso, ...activeRules };
+      try { localStorage.setItem(`atm_rules_${dataUid}`, JSON.stringify(rulesOverride)); } catch (e) { /* ignore */ }
+      applyAutoRules();
+      // המפיץ שומר גם בשרת, כדי שהבחירה תופיע בכל המכשירים ואצל העובדים
+      if (userRole === "owner" && dataUid && subscriptionValid) {
+        db.collection("distributors").doc(dataUid).collection("settings").doc("route")
+          .set({ calcModes: rulesOverride }, { merge: true })
+          .catch((err) => console.warn("save calc modes failed:", err && err.code));
       }
     }
 
@@ -1566,14 +1689,21 @@
       });
     };
 
-    document.querySelectorAll(".chip-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const grp = btn.getAttribute("data-rule-group");
-        const val = btn.getAttribute("data-rule-val");
+    // לחיצה על התאמת חישוב: נשמרת לתאריך הביקור (ומתאפסת לבד בתאריך הבא)
+    document.querySelector(".rules-bar").addEventListener("click", (e) => {
+      const btn = e.target.closest(".chip-btn");
+      if (!btn) return;
+      const grp = btn.getAttribute("data-rule-group");
+      const val = btn.getAttribute("data-rule-val");
+      if (grp === "refillDay") {
+        // יום ביקור אחר = תאריך אחר: מחשבים מחדש תקופה וחגים לתאריך הזה
+        activeRules = autoRulesFor(Number(val));
+      } else {
         activeRules[grp] = val;
-        syncRuleChipButtons();
-        updateStatsAndList(currentTerminals);
-      });
+      }
+      syncRuleChipButtons();
+      updateStatsAndList(currentTerminals);
+      saveRulesOverride();
     });
 
     async function triggerCasSync(uid) {
@@ -1607,15 +1737,24 @@
         updateTrialPill(data);
       }, (err) => console.warn("profile listener:", err && err.code));
 
+      // ימי קו + בחירת התאמות חישוב שנשמרה (גם לעובדים - לקריאה בלבד)
+      userRef.collection("settings").doc("route").get().then((snap) => {
+        const data = snap.exists ? (snap.data() || {}) : {};
+        const days = Array.isArray(data.days) && data.days.length ? data.days : [0, 2, 4];
+        routeDays = days.map(Number).filter((d) => d >= 0 && d <= 6);
+        renderDaysSelector(routeDays);
+        let local = null;
+        try { local = JSON.parse(localStorage.getItem(`atm_rules_${uid}`) || "null"); } catch (e) { /* ignore */ }
+        const remote = data.calcModes && data.calcModes.date ? data.calcModes : null;
+        rulesOverride = [remote, local].filter(Boolean).sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || null;
+        renderRefillDayChips();
+        applyAutoRules();
+      }).catch((err) => console.warn("route load:", err && err.code));
+
       const isDriver = userRole === "driver";
       if (isDriver) {
         document.getElementById("lastSyncPill").textContent = "עובד";
       } else {
-      userRef.collection("settings").doc("route").get().then((snap) => {
-        const days = snap.exists && Array.isArray(snap.data().days) ? snap.data().days : [0, 2, 4];
-        routeDays = days.map(Number).filter((d) => d >= 0 && d <= 6);
-        renderDaysSelector(days);
-      });
 
       userRef.collection("settings").doc("alerts").get().then((snap) => {
         const data = snap.exists ? (snap.data() || {}) : {};
@@ -1824,12 +1963,25 @@
     document.getElementById("saveRouteBtn").addEventListener("click", async () => {
       if (!guardWrite()) return;
       const days = [...document.querySelectorAll("#daysContainer input:checked")].map((el) => Number(el.value));
-      await db.collection("distributors").doc(dataUid).collection("settings").doc("route").set({
-        days,
-        updatedAt: Date.now()
-      }, { merge: true });
-      document.getElementById("routeSavedMsg").textContent = "נשמר";
-      setTimeout(() => { document.getElementById("routeSavedMsg").textContent = ""; }, 2000);
+      if (!days.length) {
+        alert("יש לסמן לפחות יום קו אחד");
+        return;
+      }
+      const msg = document.getElementById("routeSavedMsg");
+      try {
+        await db.collection("distributors").doc(dataUid).collection("settings").doc("route").set({
+          days,
+          updatedAt: Date.now()
+        }, { merge: true });
+      } catch (err) {
+        alert("שמירת ימי הקו נכשלה: " + errorHe(err, err && err.message));
+        return;
+      }
+      routeDays = days;
+      renderRefillDayChips();
+      applyAutoRules();
+      msg.textContent = "✓ נשמר";
+      setTimeout(() => { msg.textContent = ""; }, 2500);
     });
 
     document.getElementById("saveAndSyncCasBtn").addEventListener("click", async () => {
@@ -1902,7 +2054,8 @@
     });
 
     renderDaysSelector([0, 2, 4]);
-    syncRuleChipButtons();
+    renderRefillDayChips();
+    applyAutoRules();
 
     // ---------- תפקיד המשתמש: מפיץ / עובד ----------
 
@@ -2121,7 +2274,6 @@
     let lastReportRows = [];
 
     // ---------- מגמות ותחזית (מההיסטוריה היומית שהמנוע אוסף) ----------
-    let routeDays = [0, 2, 4];
 
     function localIsoDate(d) {
       return d.toLocaleDateString("en-CA"); // YYYY-MM-DD לפי שעון המכשיר

@@ -62,6 +62,11 @@ service cloud.firestore {
       return v is string && v.size() == 512 && v.matches('^[A-Za-z0-9+/=]+$');
     }
 
+    function validRoute(d) {
+      return d.days is list && d.days.size() <= 7
+        && (!('calcModes' in d) || (d.calcModes is map && d.calcModes.size() <= 6));
+    }
+
     function changedKeys() {
       return request.resource.data.diff(resource.data).affectedKeys();
     }
@@ -177,13 +182,18 @@ service cloud.firestore {
           && request.resource.data.enabled is bool;
       }
 
+      // ימי קו + מצבי חישוב (חג/רמדאן וכו'). עדכון בודק רק את השדות שמשתנים,
+      // כך שמסמך ישן עם שדות נוספים (activeDays) לא חוסם שמירה.
       match /settings/route {
-        allow read: if isOwner(uid);
-        allow write: if isOwner(uid)
+        allow read: if ownerOrDriver(uid);
+        allow create: if isOwner(uid)
           && hasValidSub(uid)
-          && request.resource.data.keys().hasOnly(['days', 'updatedAt'])
-          && request.resource.data.days is list
-          && request.resource.data.days.size() <= 7;
+          && request.resource.data.keys().hasOnly(['days', 'updatedAt', 'calcModes'])
+          && validRoute(request.resource.data);
+        allow update: if isOwner(uid)
+          && hasValidSub(uid)
+          && changedKeys().hasOnly(['days', 'updatedAt', 'calcModes'])
+          && validRoute(request.resource.data);
       }
 
       match /settings/cas_sync {
