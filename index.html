@@ -637,6 +637,10 @@
     }
 
     .hidden { display: none !important; }
+    body.role-driver .owner-only { display: none !important; }
+    .report-table { border-collapse: collapse; width: 100%; margin-top: 8px; font-size: 0.88rem; color: #111827; }
+    .report-table th, .report-table td { border-bottom: 1px solid #e5e7eb; padding: 5px 8px; text-align: right; }
+    .report-table th { background: #f8fafc; }
     .status-note { font-size: 0.88rem; color: var(--muted); }
   </style>
 
@@ -652,18 +656,31 @@
       <span class="atm-tag">ATM</span>
       <span>ניהול קו כספומטים</span>
     </div>
-    <p class="status-note" style="margin:0">התחבר לחשבון המפיץ או הירשם לחודש ניסיון חינם.</p>
+    <p class="status-note" style="margin:0">התחבר לחשבון המפיץ או הירשם לחודש ניסיון חינם. נהג שהוזמן - הירשם עם האימייל שאליו נשלחה ההזמנה.</p>
     <input id="emailInput" type="email" placeholder="אימייל" autocomplete="email" />
     <input id="passwordInput" type="password" placeholder="סיסמה (לפחות 6 תווים)" autocomplete="current-password" />
     <button id="loginBtn" type="button" class="btn-primary">התחברות</button>
+    <label class="status-note" style="display:flex;gap:6px;align-items:flex-start;">
+      <input id="termsCheckbox" type="checkbox" style="width:auto;margin-top:3px;" />
+      <span>קראתי ואני מסכים/ה ל<a href="terms.html" target="_blank">תנאי השימוש</a> ול<a href="privacy.html" target="_blank">מדיניות הפרטיות</a> (נדרש להרשמה)</span>
+    </label>
     <button id="registerBtn" type="button">הרשמה + חודש ניסיון חינם</button>
+    <button id="forgotBtn" type="button" style="background:none;border:none;color:#2563eb;padding:0;">שכחתי סיסמה</button>
     <div id="authError" style="color:#b91c1c;font-size:0.88rem;"></div>
+    <div id="authInfo" style="color:#15803d;font-size:0.88rem;"></div>
   </div>
 
   <!-- מסך ניהול ראשי -->
   <div id="appSection" class="hidden">
     <div id="lockBanner" class="alert-banner hidden" style="background:#92400e;">🔒 תקופת הניסיון/המנוי הסתיימה — הנתונים מוצגים לקריאה בלבד. לחץ "שדרוג / תשלום" כדי להמשיך.</div>
     <div id="alertBanner" class="alert-banner hidden"></div>
+    <div id="offlineBanner" class="alert-banner hidden" style="background:#475569;">📴 אין חיבור לאינטרנט — אפשר להמשיך לעבוד, השינויים יישמרו כשהחיבור יחזור.</div>
+    <div id="verifyBanner" class="alert-banner hidden" style="background:#1d4ed8;">
+      ✉️ יש לאמת את כתובת האימייל (נשלח אליך קישור). בלי אימות לא ניתן לחבר כספונט או להזמין נהגים.
+      <button id="resendVerifyBtn" type="button" style="margin-inline-start:8px;padding:3px 10px;">שלח שוב</button>
+      <button id="checkVerifyBtn" type="button" style="padding:3px 10px;">כבר אימתתי</button>
+    </div>
+    <div id="driverBanner" class="alert-banner hidden" style="background:#0f766e;"></div>
 
     <header class="topbar">
       <div class="brand-group">
@@ -680,10 +697,12 @@
       <div class="toolbar">
         <input id="searchInput" type="search" placeholder="חיפוש מסוף / מספר..." />
         <button id="refreshBtn" type="button">🔄 רענן</button>
-        <button id="toggleRouteBtn" type="button">📅 ימי קו</button>
-        <button id="toggleCasBtn" type="button">🏦 כספונט</button>
-        <button id="toggleAlertsBtn" type="button">🔔 התראות</button>
-        <button id="openPayModalBtn" type="button" class="btn-pay">💳 שדרוג / תשלום</button>
+        <button id="toggleRouteBtn" type="button" class="owner-only">📅 ימי קו</button>
+        <button id="toggleCasBtn" type="button" class="owner-only">🏦 כספונט</button>
+        <button id="toggleAlertsBtn" type="button" class="owner-only">🔔 התראות</button>
+        <button id="toggleDriversBtn" type="button" class="owner-only">👥 נהגים</button>
+        <button id="toggleReportsBtn" type="button">📊 דוחות</button>
+        <button id="openPayModalBtn" type="button" class="btn-pay owner-only">💳 שדרוג / תשלום</button>
         <button id="whatsappBtn" type="button" class="btn-whatsapp">💬 שלח לוואטסאפ</button>
         <a id="adminLink" href="admin.html" class="hidden" style="color:#fde68a;font-weight:700;text-decoration:none;">⚙️ ניהול</a>
         <button id="logoutBtn" type="button">יציאה</button>
@@ -713,6 +732,31 @@
         <div id="casPassState" class="status-note" style="margin-bottom:8px;">🔒 הסיסמה מוצפנת בדפדפן לפני השמירה, ורק שרת הסנכרון יכול לפענח אותה.</div>
         <button id="saveAndSyncCasBtn" type="button" class="btn-primary">שמור ובקש סנכרון מכספונט</button>
         <div id="casSyncStatus" class="status-note" style="margin-top:8px;"></div>
+      </section>
+
+      <!-- נהגים -->
+      <section id="driversPanel" class="panel hidden">
+        <strong>👥 נהגים</strong>
+        <p class="status-note" style="margin:8px 0;">
+          נהג יכול לראות את המסופים, לסמן הטענות (עם סכום), נייר והערות - בלי גישה להגדרות, למנוי או לכספונט.
+          הזמן לפי אימייל; הנהג נרשם עם אותו אימייל, מאמת אותו, ומצטרף אוטומטית.
+        </p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+          <input id="driverEmailInput" type="email" placeholder="אימייל של הנהג" style="flex:1 1 220px;" />
+          <button id="inviteDriverBtn" type="button" class="btn-primary">שלח הזמנה</button>
+        </div>
+        <div id="driversList" class="status-note"></div>
+      </section>
+
+      <!-- דוחות הטענה -->
+      <section id="reportsPanel" class="panel hidden">
+        <strong>📊 היסטוריית הטענות ודוחות</strong>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0;">
+          <input id="reportMonthInput" type="month" style="width:auto;" />
+          <button id="loadReportBtn" type="button" class="btn-primary">הצג</button>
+          <button id="exportReportBtn" type="button">⬇️ ייצוא לאקסל (CSV)</button>
+        </div>
+        <div id="reportOutput" class="status-note">בחר חודש ולחץ "הצג".</div>
       </section>
 
       <!-- התראות וואטסאפ -->
@@ -851,7 +895,37 @@
       firebase.initializeApp(firebaseConfig);
     }
     const auth = firebase.auth();
+    auth.languageCode = "he"; // מיילים של איפוס סיסמה / אימות - בעברית
     const db = firebase.firestore();
+    // עבודה בלי קליטה: הנתונים נשמרים במכשיר והשינויים נשלחים כשהחיבור חוזר
+    db.enablePersistence({ synchronizeTabs: true }).catch((err) => console.warn("offline persistence unavailable:", err && err.code));
+
+    const ADMIN_UID = "TblW8UHDSBTh91BCJcqo3YKEqQJ3";
+    const TERMS_VERSION = "2026-11-24";
+    let dataUid = null;      // של מי הנתונים שמוצגים: המפיץ עצמו, או המפיץ שהזמין את הנהג
+    let userRole = "owner";  // "owner" (מפיץ) או "driver" (נהג)
+
+    const AUTH_ERRORS_HE = {
+      "auth/invalid-email": "כתובת האימייל לא תקינה.",
+      "auth/missing-email": "יש להזין אימייל.",
+      "auth/missing-password": "יש להזין סיסמה.",
+      "auth/user-not-found": "האימייל או הסיסמה שגויים.",
+      "auth/wrong-password": "האימייל או הסיסמה שגויים.",
+      "auth/invalid-credential": "האימייל או הסיסמה שגויים.",
+      "auth/invalid-login-credentials": "האימייל או הסיסמה שגויים.",
+      "auth/email-already-in-use": "כבר קיים חשבון עם האימייל הזה. נסה להתחבר או לאפס סיסמה.",
+      "auth/weak-password": "הסיסמה חלשה מדי - לפחות 6 תווים.",
+      "auth/too-many-requests": "יותר מדי ניסיונות. נסה שוב בעוד כמה דקות.",
+      "auth/network-request-failed": "אין חיבור לאינטרנט. בדוק את החיבור ונסה שוב.",
+      "auth/user-disabled": "החשבון הזה הושבת. פנה לתמיכה.",
+      "auth/requires-recent-login": "מטעמי אבטחה יש להתחבר מחדש ולנסות שוב.",
+      "permission-denied": "אין הרשאה לפעולה הזו.",
+      "unavailable": "אין חיבור לשרת כרגע. נסה שוב בעוד רגע."
+    };
+    function errorHe(err, fallback) {
+      const code = err && err.code ? String(err.code) : "";
+      return AUTH_ERRORS_HE[code] || fallback || "אירעה שגיאה. נסה שוב.";
+    }
 
     const DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
     const TRIAL_DAYS_DEFAULT = 30;
@@ -886,8 +960,21 @@
     const SAFE_TERMINAL_ID = /^[A-Za-z0-9_-]{1,40}$/;
 
     // חוסם עריכה כשהמנוי/הניסיון הסתיים (האכיפה האמיתית נמצאת ב-firestore.rules)
+    // פעולות ניהול (סף, יעד, מגזר, סדר, הסתרה) - למפיץ בלבד, לא לנהג
+    function guardManage() {
+      if (userRole === "driver") {
+        alert("פעולה זו זמינה רק למפיץ.");
+        return false;
+      }
+      return guardWrite();
+    }
+
     function guardWrite() {
-      if (!currentUser) return false;
+      if (!currentUser || !dataUid) return false;
+      if (!subscriptionValid && userRole === "driver") {
+        alert("המנוי של המפיץ הסתיים - לא ניתן לעדכן כרגע.");
+        return false;
+      }
       if (!subscriptionValid) {
         document.getElementById("paymentFeedback").textContent = "תקופת הניסיון הסתיימה - יש לשדרג כדי להמשיך לערוך.";
         document.getElementById("paymentModal").classList.remove("hidden");
@@ -1121,9 +1208,9 @@
                   title="${paperNeeded ? "מסומן שנגמר גליל קבלות - לחץ לביטול" : "סמן שנגמר גליל קבלות וצריך להחליף"}"
                   onclick="togglePaperRoll('${safeIdAttr}')"
                 >🧻 נייר${paperNeeded ? " — להחלפה" : ""}</button>
-                <button type="button" class="paper-btn" title="הזז למעלה במסלול" onclick="moveTerminal('${safeIdAttr}', -1)">▲</button>
-                <button type="button" class="paper-btn" title="הזז למטה במסלול" onclick="moveTerminal('${safeIdAttr}', 1)">▼</button>
-                <button type="button" class="paper-btn" title="${isHidden ? "החזר מסוף לרשימה" : "הסתר מסוף (לא ייספר בסיכומים ובהתראות)"}" onclick="toggleHidden('${safeIdAttr}')">${isHidden ? "👁 הצג" : "🙈 הסתר"}</button>
+                <button type="button" class="paper-btn owner-only" title="הזז למעלה במסלול" onclick="moveTerminal('${safeIdAttr}', -1)">▲</button>
+                <button type="button" class="paper-btn owner-only" title="הזז למטה במסלול" onclick="moveTerminal('${safeIdAttr}', 1)">▼</button>
+                <button type="button" class="paper-btn owner-only" title="${isHidden ? "החזר מסוף לרשימה" : "הסתר מסוף (לא ייספר בסיכומים ובהתראות)"}" onclick="toggleHidden('${safeIdAttr}')">${isHidden ? "👁 הצג" : "🙈 הסתר"}</button>
               </div>
               <div class="terminal-meta">
                 <span>מזהה: ${safeIdText}</span>
@@ -1131,7 +1218,7 @@
                 <span>סף התראה: ₪${threshold}</span>
                 <button
                   type="button"
-                  class="inline-mini-edit"
+                  class="inline-mini-edit owner-only"
                   title="ערוך סף התראה (₪)"
                   aria-label="ערוך סף התראה"
                   onclick="editTerminalThreshold('${safeIdAttr}')"
@@ -1166,7 +1253,7 @@
                 <strong class="metric-val" id="target-val-${safeIdAttr}">${targetDisplayText}</strong>
                 <button
                   type="button"
-                  class="icon-edit-btn"
+                  class="icon-edit-btn owner-only"
                   title="הזן / ערוך יעד מילוי"
                   aria-label="הזן / ערוך יעד מילוי"
                   onclick="openEditTargetModal('${safeIdAttr}')"
@@ -1248,7 +1335,7 @@
     }
 
     window.toggleTerminalSector = async function (terminalId) {
-      if (!guardWrite()) return;
+      if (!guardManage()) return;
       const t = currentTerminals.find((x) => String(x.id) === String(terminalId));
       if (!t) return;
       const currentSector = getTerminalSector(t);
@@ -1259,7 +1346,7 @@
           : "jewish";
       await db
         .collection("distributors")
-        .doc(currentUser.uid)
+        .doc(dataUid)
         .collection("terminals")
         .doc(String(terminalId))
         .set({ sector: nextSector }, { merge: true });
@@ -1272,19 +1359,19 @@
       const nextState = !Boolean(t.paperRollNeeded);
       await db
         .collection("distributors")
-        .doc(currentUser.uid)
+        .doc(dataUid)
         .collection("terminals")
         .doc(String(terminalId))
         .set({ paperRollNeeded: nextState }, { merge: true });
     };
 
     window.toggleHidden = async function (terminalId) {
-      if (!guardWrite()) return;
+      if (!guardManage()) return;
       const t = currentTerminals.find((x) => String(x.id) === String(terminalId));
       if (!t) return;
       await db
         .collection("distributors")
-        .doc(currentUser.uid)
+        .doc(dataUid)
         .collection("terminals")
         .doc(String(terminalId))
         .set({ hidden: !Boolean(t.hidden) }, { merge: true });
@@ -1292,14 +1379,14 @@
 
     // שינוי סדר המסלול: מחליף מקום עם המסוף הסמוך ושומר סדר רציף 1..N
     window.moveTerminal = async function (terminalId, dir) {
-      if (!guardWrite()) return;
+      if (!guardManage()) return;
       const list = [...currentTerminals];
       const idx = list.findIndex((x) => String(x.id) === String(terminalId));
       const target = idx + dir;
       if (idx < 0 || target < 0 || target >= list.length) return;
       [list[idx], list[target]] = [list[target], list[idx]];
       const batch = db.batch();
-      const col = db.collection("distributors").doc(currentUser.uid).collection("terminals");
+      const col = db.collection("distributors").doc(dataUid).collection("terminals");
       list.forEach((t, i) => {
         if (Number(t.order) !== i + 1) batch.set(col.doc(String(t.id)), { order: i + 1 }, { merge: true });
       });
@@ -1311,7 +1398,7 @@
     };
 
     window.editTerminalThreshold = async function (terminalId) {
-      if (!guardWrite()) return;
+      if (!guardManage()) return;
       const t = currentTerminals.find((x) => String(x.id) === String(terminalId));
       const currentThresh = getTerminalThreshold(t || {});
       const input = prompt(`הזן סף התראה בשקלים (₪) למסוף ${t?.name || terminalId} (${terminalId}):`, String(currentThresh));
@@ -1324,7 +1411,7 @@
       }
       await db
         .collection("distributors")
-        .doc(currentUser.uid)
+        .doc(dataUid)
         .collection("terminals")
         .doc(String(terminalId))
         .set({ threshold: Math.round(parsed) }, { merge: true });
@@ -1338,14 +1425,14 @@
       if (input === null) return;
       await db
         .collection("distributors")
-        .doc(currentUser.uid)
+        .doc(dataUid)
         .collection("terminals")
         .doc(String(terminalId))
         .set({ notes: input.trim() }, { merge: true });
     };
 
     window.openEditTargetModal = async function (terminalId) {
-      if (!guardWrite()) return;
+      if (!guardManage()) return;
       const t = currentTerminals.find((x) => String(x.id) === String(terminalId));
       const initialVal = hasConfiguredTargetK(t) ? String(Number(t.baseTargetK)) : "";
       const input = prompt(`הזן יעד מילוי באלפים (k) למסוף ${terminalId}:`, initialVal);
@@ -1354,7 +1441,7 @@
       if (trimmed === "") {
         await db
           .collection("distributors")
-          .doc(currentUser.uid)
+          .doc(dataUid)
           .collection("terminals")
           .doc(String(terminalId))
           .set({ baseTargetK: null }, { merge: true });
@@ -1367,7 +1454,7 @@
       }
       await db
         .collection("distributors")
-        .doc(currentUser.uid)
+        .doc(dataUid)
         .collection("terminals")
         .doc(String(terminalId))
         .set({ baseTargetK: parsedK }, { merge: true });
@@ -1379,25 +1466,43 @@
       if (!t) return;
 
       const nextDone = !Boolean(t.refilled);
-      t.refilled = nextDone;
-      updateStatsAndList(currentTerminals);
+      const distRef = db.collection("distributors").doc(dataUid);
+      const termRef = distRef.collection("terminals").doc(String(terminalId));
+      const batch = db.batch();
 
-      try {
-        await db
-          .collection("distributors")
-          .doc(currentUser.uid)
-          .collection("terminals")
-          .doc(String(terminalId))
-          .set({
-            refilled: nextDone,
-            lastRefilledAt: nextDone ? Date.now() : null
-          }, { merge: true });
-      } catch (err) {
-        console.error("toggleCompleted failed:", err);
-        t.refilled = !nextDone;
-        updateStatsAndList(currentTerminals);
-        alert("שגיאה בעדכון הטענה: " + (err && err.message ? err.message : String(err)));
+      if (nextDone) {
+        // רישום הטענה בהיסטוריה - עם הסכום שהוטען בפועל (ברירת מחדל: הסכום המחושב)
+        const suggested = calcLoadAmountILS(t.balance, getEffectiveTargetK(t));
+        const input = prompt(`כמה הוטען במסוף ${t.name || terminalId}? (₪)`, suggested ? String(suggested) : "");
+        if (input === null) return;
+        const amount = Number(String(input).replace(/[,₪\s]/g, ""));
+        if (!Number.isFinite(amount) || amount < 0 || amount > 1000000) {
+          alert("יש להזין סכום תקין בשקלים");
+          return;
+        }
+        const refillRef = distRef.collection("refills").doc();
+        const now = Date.now();
+        batch.set(refillRef, {
+          terminalId: String(terminalId),
+          terminalName: String(t.name || terminalId).slice(0, 80),
+          amount: Math.round(amount),
+          balanceBefore: Math.round(Number(t.balance) || 0),
+          at: now,
+          byUid: currentUser.uid,
+          byEmail: currentUser.email || ""
+        });
+        batch.set(termRef, { refilled: true, lastRefilledAt: now, lastRefillId: refillRef.id }, { merge: true });
+      } else {
+        if (!confirm(`לבטל את סימון ההטענה של ${t.name || terminalId}? גם הרישום בהיסטוריה יימחק.`)) return;
+        if (t.lastRefillId) batch.delete(distRef.collection("refills").doc(String(t.lastRefillId)));
+        batch.set(termRef, { refilled: false, lastRefilledAt: null, lastRefillId: null }, { merge: true });
       }
+
+      // בלי קליטה ה-commit ממתין לחיבור, אבל המסך מתעדכן מיד מהנתונים המקומיים
+      batch.commit().catch((err) => {
+        console.error("toggleCompleted failed:", err);
+        alert("שגיאה בעדכון הטענה: " + errorHe(err, err && err.message));
+      });
     };
 
     document.querySelectorAll(".chip-btn").forEach((btn) => {
@@ -1439,8 +1544,12 @@
       unsubscribeProfile = userRef.onSnapshot((snap) => {
         const data = snap.exists ? (snap.data() || {}) : {};
         updateTrialPill(data);
-      });
+      }, (err) => console.warn("profile listener:", err && err.code));
 
+      const isDriver = userRole === "driver";
+      if (isDriver) {
+        document.getElementById("lastSyncPill").textContent = "נהג";
+      } else {
       userRef.collection("settings").doc("route").get().then((snap) => {
         const days = snap.exists && Array.isArray(snap.data().days) ? snap.data().days : [0, 2, 4];
         renderDaysSelector(days);
@@ -1480,6 +1589,8 @@
         }
       });
 
+      } // סוף הגדרות מפיץ
+
       unsubscribeTerminals = userRef.collection("terminals").onSnapshot((snap) => {
         currentTerminals = snap.docs
           .filter((d) => SAFE_TERMINAL_ID.test(d.id))
@@ -1513,7 +1624,7 @@
       if (!currentUser) return;
       const phone = document.getElementById("payerPhoneInput").value.trim();
       const feedback = document.getElementById("paymentFeedback");
-      await db.collection("distributors").doc(currentUser.uid).set({
+      await db.collection("distributors").doc(dataUid).set({
         upgradeRequest: {
           planId: selectedPlan.id,
           planLabel: selectedPlan.label,
@@ -1535,8 +1646,8 @@
       btn.textContent = "⏳ מרענן...";
       try {
         if (currentUser) {
-          bindUserListeners(currentUser.uid);
-          await triggerCasSync(currentUser.uid);
+          bindUserListeners(dataUid);
+          await triggerCasSync(dataUid);
         }
       } finally {
         setTimeout(() => {
@@ -1554,8 +1665,27 @@
       try {
         await auth.signInWithEmailAndPassword(email, pass);
       } catch (err) {
-        errEl.textContent = err && err.message ? err.message : "שגיאה בהתחברות";
+        errEl.textContent = errorHe(err, "שגיאה בהתחברות");
       }
+    });
+
+    document.getElementById("forgotBtn").addEventListener("click", async () => {
+      const errEl = document.getElementById("authError");
+      const infoEl = document.getElementById("authInfo");
+      errEl.textContent = "";
+      infoEl.textContent = "";
+      const email = document.getElementById("emailInput").value.trim();
+      if (!email) {
+        errEl.textContent = "הזן את האימייל שלך ואז לחץ שוב על \"שכחתי סיסמה\".";
+        return;
+      }
+      try {
+        await auth.sendPasswordResetEmail(email);
+      } catch (err) {
+        if (err && err.code === "auth/invalid-email") { errEl.textContent = errorHe(err); return; }
+        // לא חושפים אם קיים חשבון עם האימייל
+      }
+      infoEl.textContent = "אם קיים חשבון עם האימייל הזה, נשלח אליו קישור לאיפוס סיסמה. בדוק גם בספאם.";
     });
 
     document.getElementById("registerBtn").addEventListener("click", async () => {
@@ -1563,17 +1693,29 @@
       errEl.textContent = "";
       const email = document.getElementById("emailInput").value.trim();
       const pass = document.getElementById("passwordInput").value;
+      if (!document.getElementById("termsCheckbox").checked) {
+        errEl.textContent = "יש לאשר את תנאי השימוש ומדיניות הפרטיות כדי להירשם.";
+        return;
+      }
       try {
         const cred = await auth.createUserWithEmailAndPassword(email, pass);
+        cred.user.sendEmailVerification().catch(() => {});
+        // נהג שהוזמן לא מקבל חשבון מפיץ - הוא יצורף למפיץ אחרי אימות האימייל
+        const invite = await findInviteFor(cred.user);
+        if (invite) return;
         const now = Date.now();
         await db.collection("distributors").doc(cred.user.uid).set({
           email,
           subscriptionStatus: "trial",
           createdAt: now,
-          trialEndsAt: now + TRIAL_DAYS_DEFAULT * 24 * 60 * 60 * 1000
-        }, { merge: true });
+          trialEndsAt: now + TRIAL_DAYS_DEFAULT * 24 * 60 * 60 * 1000,
+          termsAcceptedAt: now,
+          termsVersion: TERMS_VERSION
+        });
+        // הפרופיל נוצר אחרי ש-onAuthStateChanged כבר רץ - טוענים מחדש את התפקיד
+        await startSession(cred.user);
       } catch (err) {
-        errEl.textContent = err && err.message ? err.message : "שגיאה בהרשמה";
+        errEl.textContent = errorHe(err, "שגיאה בהרשמה");
       }
     });
 
@@ -1605,7 +1747,7 @@
         return;
       }
       try {
-        await db.collection("distributors").doc(currentUser.uid).collection("settings").doc("alerts").set({
+        await db.collection("distributors").doc(dataUid).collection("settings").doc("alerts").set({
           phone,
           enabled: document.getElementById("alertEnabledInput").checked,
           updatedAt: Date.now()
@@ -1620,7 +1762,7 @@
     document.getElementById("saveRouteBtn").addEventListener("click", async () => {
       if (!guardWrite()) return;
       const days = [...document.querySelectorAll("#daysContainer input:checked")].map((el) => Number(el.value));
-      await db.collection("distributors").doc(currentUser.uid).collection("settings").doc("route").set({
+      await db.collection("distributors").doc(dataUid).collection("settings").doc("route").set({
         days,
         updatedAt: Date.now()
       }, { merge: true });
@@ -1652,7 +1794,7 @@
         }
       }
       try {
-        await db.collection("distributors").doc(currentUser.uid).collection("settings").doc("cas_sync").set(payload, { merge: true });
+        await db.collection("distributors").doc(dataUid).collection("settings").doc("cas_sync").set(payload, { merge: true });
       } catch (err) {
         alert("השמירה נכשלה: " + (err && err.message ? err.message : String(err)));
         return;
@@ -1700,19 +1842,303 @@
     renderDaysSelector([0, 2, 4]);
     syncRuleChipButtons();
 
+    // ---------- תפקיד המשתמש: מפיץ / נהג ----------
+
+    function escapeAttr(v) { return escapeHtml(v); }
+
+    async function findInviteFor(user) {
+      const email = String(user && user.email || "").trim().toLowerCase();
+      if (!email) return null;
+      try {
+        const snap = await db.collection("invites").doc(email).get();
+        return snap.exists ? { id: email, ...snap.data() } : null;
+      } catch (err) {
+        return null;
+      }
+    }
+
+    async function resolveRole(user) {
+      const cacheKey = `atm_role_${user.uid}`;
+      try {
+        const mem = await db.collection("memberships").doc(user.uid).get();
+        if (mem.exists) {
+          const m = mem.data() || {};
+          const r = { role: "driver", dataUid: m.distributorUid, distributorEmail: m.distributorEmail || "" };
+          localStorage.setItem(cacheKey, JSON.stringify(r));
+          return r;
+        }
+        const prof = await db.collection("distributors").doc(user.uid).get();
+        if (prof.exists) {
+          const r = { role: "owner", dataUid: user.uid };
+          localStorage.setItem(cacheKey, JSON.stringify(r));
+          return r;
+        }
+        const invite = await findInviteFor(user);
+        if (invite) {
+          if (!user.emailVerified) return { role: "pending-driver", invite };
+          // הצטרפות: יצירת שיוך לנהג ומחיקת ההזמנה
+          const batch = db.batch();
+          batch.set(db.collection("memberships").doc(user.uid), {
+            distributorUid: invite.distributorUid,
+            distributorEmail: invite.distributorEmail || "",
+            email: user.email,
+            role: "driver",
+            joinedAt: Date.now()
+          });
+          batch.delete(db.collection("invites").doc(invite.id));
+          await batch.commit();
+          const r = { role: "driver", dataUid: invite.distributorUid, distributorEmail: invite.distributorEmail || "" };
+          localStorage.setItem(cacheKey, JSON.stringify(r));
+          return r;
+        }
+        return { role: "owner", dataUid: user.uid };
+      } catch (err) {
+        // בלי קליטה - משתמשים בתפקיד האחרון שנשמר במכשיר
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) return JSON.parse(cached);
+        return { role: "owner", dataUid: user.uid };
+      }
+    }
+
+    async function startSession(user) {
+      currentUser = user;
+      document.getElementById("authSection").classList.add("hidden");
+      document.getElementById("appSection").classList.remove("hidden");
+      document.getElementById("userEmailBadge").textContent = user.email || "";
+      // קישור לניהול מנויים - רק למנהל (ההרשאה עצמה נאכפת ב-firestore.rules)
+      document.getElementById("adminLink").classList.toggle("hidden", user.uid !== ADMIN_UID);
+
+      const r = await resolveRole(user);
+      if (auth.currentUser !== user) return; // המשתמש התנתק בינתיים
+      const driverBanner = document.getElementById("driverBanner");
+
+      if (r.role === "pending-driver") {
+        userRole = "driver";
+        dataUid = null;
+        document.body.classList.add("role-driver");
+        driverBanner.textContent = `הוזמנת כנהג ע"י ${r.invite.distributorEmail || "מפיץ"}. אמת את האימייל (נשלח אליך קישור) ולחץ "כבר אימתתי" כדי להצטרף.`;
+        driverBanner.classList.remove("hidden");
+        document.getElementById("verifyBanner").classList.remove("hidden");
+        document.getElementById("terminalsList").innerHTML = "";
+        return;
+      }
+
+      userRole = r.role;
+      dataUid = r.dataUid;
+      document.body.classList.toggle("role-driver", userRole === "driver");
+      if (userRole === "driver") {
+        driverBanner.textContent = `🚚 מחובר כנהג של ${r.distributorEmail || "המפיץ"} - אפשר לסמן הטענות, נייר והערות.`;
+        driverBanner.classList.remove("hidden");
+      } else {
+        driverBanner.classList.add("hidden");
+      }
+      const needVerify = !user.emailVerified && user.uid !== ADMIN_UID && userRole === "owner";
+      document.getElementById("verifyBanner").classList.toggle("hidden", !needVerify);
+      bindUserListeners(dataUid);
+      if (userRole === "owner") loadDrivers().catch(() => {});
+    }
+
+    document.getElementById("resendVerifyBtn").addEventListener("click", async () => {
+      if (!currentUser) return;
+      try {
+        await currentUser.sendEmailVerification();
+        alert("נשלח קישור אימות לאימייל שלך. בדוק גם בספאם.");
+      } catch (err) {
+        alert(errorHe(err, "השליחה נכשלה, נסה שוב בעוד כמה דקות."));
+      }
+    });
+
+    document.getElementById("checkVerifyBtn").addEventListener("click", async () => {
+      if (!currentUser) return;
+      await currentUser.reload();
+      if (!auth.currentUser.emailVerified) {
+        alert("האימייל עדיין לא אומת. לחץ על הקישור שנשלח אליך ונסה שוב.");
+        return;
+      }
+      await auth.currentUser.getIdToken(true); // רענון ההרשאות אחרי האימות
+      await startSession(auth.currentUser);
+    });
+
+    // ---------- נהגים ----------
+
+    async function loadDrivers() {
+      const el = document.getElementById("driversList");
+      if (!dataUid || userRole !== "owner") return;
+      const [mems, invs] = await Promise.all([
+        db.collection("memberships").where("distributorUid", "==", dataUid).get(),
+        db.collection("invites").where("distributorUid", "==", dataUid).get()
+      ]);
+      const items = [];
+      mems.forEach((d) => items.push(`<div style="display:flex;gap:8px;align-items:center;margin:4px 0;">🚚 <b>${escapeHtml(d.data().email || "")}</b> <span>נהג פעיל</span>
+        <button type="button" data-remove-member="${escapeAttr(d.id)}">הסר</button></div>`));
+      invs.forEach((d) => items.push(`<div style="display:flex;gap:8px;align-items:center;margin:4px 0;">✉️ ${escapeHtml(d.id)} <span>ממתין להרשמה</span>
+        <button type="button" data-cancel-invite="${escapeAttr(d.id)}">בטל הזמנה</button></div>`));
+      el.innerHTML = items.length ? items.join("") : "אין נהגים עדיין.";
+    }
+
+    document.getElementById("driversList").addEventListener("click", async (e) => {
+      const rm = e.target.closest("[data-remove-member]");
+      const ci = e.target.closest("[data-cancel-invite]");
+      try {
+        if (rm && confirm("להסיר את הנהג? הוא יאבד גישה מיד.")) {
+          await db.collection("memberships").doc(rm.getAttribute("data-remove-member")).delete();
+        } else if (ci) {
+          await db.collection("invites").doc(ci.getAttribute("data-cancel-invite")).delete();
+        } else {
+          return;
+        }
+        await loadDrivers();
+      } catch (err) {
+        alert(errorHe(err, "הפעולה נכשלה"));
+      }
+    });
+
+    document.getElementById("inviteDriverBtn").addEventListener("click", async () => {
+      if (!guardManage()) return;
+      if (!currentUser.emailVerified && currentUser.uid !== ADMIN_UID) {
+        alert("יש לאמת קודם את האימייל שלך (ראה ההודעה בראש המסך).");
+        return;
+      }
+      const email = document.getElementById("driverEmailInput").value.trim().toLowerCase();
+      if (!/^[^\s@/]+@[^\s@/]+\.[^\s@/]+$/.test(email) || email.length > 120) {
+        alert("כתובת אימייל לא תקינה");
+        return;
+      }
+      if (email === String(currentUser.email || "").toLowerCase()) {
+        alert("לא ניתן להזמין את עצמך");
+        return;
+      }
+      try {
+        await db.collection("invites").doc(email).set({
+          distributorUid: dataUid,
+          distributorEmail: currentUser.email || "",
+          createdAt: Date.now()
+        });
+        document.getElementById("driverEmailInput").value = "";
+        await loadDrivers();
+        const appUrl = location.origin + location.pathname;
+        const text = `הוזמנת להצטרף כנהג לאפליקציית ניהול הכספומטים. הירשם עם האימייל ${email} כאן: ${appUrl}`;
+        if (confirm("ההזמנה נשמרה. לשלוח לנהג את הקישור בוואטסאפ?")) {
+          window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+        }
+      } catch (err) {
+        alert(errorHe(err, "ההזמנה נכשלה (ייתכן שהאימייל כבר הוזמן ע\"י מפיץ אחר)"));
+      }
+    });
+
+    document.getElementById("toggleDriversBtn").addEventListener("click", () => {
+      document.getElementById("driversPanel").classList.toggle("hidden");
+      loadDrivers().catch(() => {});
+    });
+
+    // ---------- דוחות הטענה ----------
+
+    let lastReportRows = [];
+
+    function monthRange(value) {
+      const [y, m] = String(value).split("-").map(Number);
+      return { start: new Date(y, m - 1, 1).getTime(), end: new Date(y, m, 1).getTime() };
+    }
+
+    async function loadReport() {
+      const out = document.getElementById("reportOutput");
+      const month = document.getElementById("reportMonthInput").value;
+      if (!month || !dataUid) return;
+      out.textContent = "טוען...";
+      const { start, end } = monthRange(month);
+      try {
+        const snap = await db.collection("distributors").doc(dataUid).collection("refills")
+          .where("at", ">=", start).where("at", "<", end).orderBy("at").get();
+        lastReportRows = snap.docs.map((d) => d.data());
+      } catch (err) {
+        out.textContent = errorHe(err, "טעינת הדוח נכשלה");
+        return;
+      }
+      if (!lastReportRows.length) {
+        out.textContent = "אין הטענות רשומות בחודש הזה. (ההיסטוריה נרשמת מרגע העדכון הזה ואילך.)";
+        return;
+      }
+      const total = lastReportRows.reduce((a, r) => a + Number(r.amount || 0), 0);
+      const byTerm = {};
+      const byDay = {};
+      const byDriver = {};
+      lastReportRows.forEach((r) => {
+        const k = r.terminalId;
+        byTerm[k] = byTerm[k] || { name: r.terminalName || k, count: 0, sum: 0 };
+        byTerm[k].count += 1;
+        byTerm[k].sum += Number(r.amount || 0);
+        const day = new Date(r.at).toLocaleDateString("he-IL");
+        byDay[day] = (byDay[day] || 0) + Number(r.amount || 0);
+        const who = r.byEmail || "—";
+        byDriver[who] = (byDriver[who] || 0) + Number(r.amount || 0);
+      });
+      const termRows = Object.entries(byTerm).sort((a, b) => b[1].sum - a[1].sum)
+        .map(([id, v]) => `<tr><td>${escapeHtml(v.name)}</td><td>${escapeHtml(id)}</td><td>${v.count}</td><td>₪${formatAmountILS(v.sum)}</td><td>₪${formatAmountILS(Math.round(v.sum / v.count))}</td></tr>`).join("");
+      const dayRows = Object.entries(byDay).map(([d, s]) => `<tr><td>${escapeHtml(d)}</td><td>₪${formatAmountILS(s)}</td><td>${calcExactPacks5k(s)}</td></tr>`).join("");
+      const driverRows = Object.entries(byDriver).map(([w, s]) => `<tr><td>${escapeHtml(w)}</td><td>₪${formatAmountILS(s)}</td></tr>`).join("");
+      out.innerHTML = `
+        <div style="color:#111827;font-weight:800;margin:6px 0;">סה"כ הוטען: ₪${formatAmountILS(total)} · ${lastReportRows.length} הטענות · ${calcExactPacks5k(total)} חבילות 5K</div>
+        <table class="report-table"><tr><th>מסוף</th><th>מזהה</th><th>הטענות</th><th>סה"כ</th><th>ממוצע להטענה</th></tr>${termRows}</table>
+        <table class="report-table"><tr><th>יום</th><th>סה"כ</th><th>חבילות 5K</th></tr>${dayRows}</table>
+        <table class="report-table"><tr><th>מי הטעין</th><th>סה"כ</th></tr>${driverRows}</table>`;
+    }
+
+    document.getElementById("loadReportBtn").addEventListener("click", loadReport);
+    document.getElementById("toggleReportsBtn").addEventListener("click", () => {
+      const panel = document.getElementById("reportsPanel");
+      panel.classList.toggle("hidden");
+      const input = document.getElementById("reportMonthInput");
+      if (!input.value) {
+        const d = new Date();
+        input.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      }
+      if (!panel.classList.contains("hidden")) loadReport();
+    });
+
+    document.getElementById("exportReportBtn").addEventListener("click", () => {
+      if (!lastReportRows.length) { alert("אין נתונים לייצוא - הצג קודם חודש עם הטענות."); return; }
+      const csvCell = (v) => {
+        let s = String(v ?? "");
+        if (/^[=+\-@]/.test(s)) s = "'" + s; // מניעת הזרקת נוסחאות באקסל
+        return `"${s.replace(/"/g, '""')}"`;
+      };
+      const lines = [["תאריך", "שעה", "מסוף", "מזהה", "סכום", "יתרה לפני", "מי הטעין"].map(csvCell).join(",")];
+      lastReportRows.forEach((r) => {
+        const d = new Date(r.at);
+        lines.push([d.toLocaleDateString("he-IL"), d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" }),
+          r.terminalName, r.terminalId, r.amount, r.balanceBefore ?? "", r.byEmail || ""].map(csvCell).join(","));
+      });
+      const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `הטענות-${document.getElementById("reportMonthInput").value}.csv`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    });
+
+    // ---------- בלי קליטה ----------
+    function updateOnlineBanner() {
+      document.getElementById("offlineBanner").classList.toggle("hidden", navigator.onLine);
+    }
+    window.addEventListener("online", updateOnlineBanner);
+    window.addEventListener("offline", updateOnlineBanner);
+    updateOnlineBanner();
+
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js").catch(() => {});
+    }
+
     auth.onAuthStateChanged((user) => {
       currentUser = user;
       if (user) {
-        document.getElementById("authSection").classList.add("hidden");
-        document.getElementById("appSection").classList.remove("hidden");
-        document.getElementById("userEmailBadge").textContent = user.email || "";
-        // קישור לניהול מנויים - רק למנהל (ההרשאה עצמה נאכפת ב-firestore.rules)
-        document.getElementById("adminLink").classList.toggle("hidden", user.uid !== "TblW8UHDSBTh91BCJcqo3YKEqQJ3");
-        bindUserListeners(user.uid);
+        startSession(user);
       } else {
         if (unsubscribeTerminals) unsubscribeTerminals();
         if (unsubscribeCas) unsubscribeCas();
         if (unsubscribeProfile) unsubscribeProfile();
+        dataUid = null;
+        userRole = "owner";
+        document.body.classList.remove("role-driver");
         document.getElementById("appSection").classList.add("hidden");
         document.getElementById("authSection").classList.remove("hidden");
       }

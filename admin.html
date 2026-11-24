@@ -254,14 +254,19 @@
     }
 
     async function load() {
-      const snap = await db.collection("distributors").get();
+      const [snap, notesSnap] = await Promise.all([
+        db.collection("distributors").get(),
+        db.collection("adminNotes").get()
+      ]);
+      const notes = {};
+      notesSnap.forEach((n) => { notes[n.id] = (n.data() || {}).note || ""; });
       rows = await Promise.all(snap.docs.map(async (d) => {
         let cas = null;
         try {
           const c = await d.ref.collection("settings").doc("cas_sync").get();
           cas = c.exists ? c.data() : null;
         } catch (e) { /* ignore */ }
-        return { uid: d.id, p: d.data() || {}, cas };
+        return { uid: d.id, p: { ...(d.data() || {}), adminNote: notes[d.id] || "" }, cas };
       }));
       render();
     }
@@ -315,7 +320,8 @@
       const r = rows.find((x) => x.uid === uid);
       const input = prompt("הערה פנימית למפיץ (רק אתה רואה):", r.p.adminNote || "");
       if (input === null) return;
-      await db.collection("distributors").doc(uid).update({ adminNote: input.trim().slice(0, 500) });
+      // ההערה נשמרת באוסף נפרד שרק המנהל רואה (לא על הפרופיל של המפיץ)
+      await db.collection("adminNotes").doc(uid).set({ note: input.trim().slice(0, 500), updatedAt: Date.now() });
     }
 
     document.getElementById("list").addEventListener("click", async (e) => {
