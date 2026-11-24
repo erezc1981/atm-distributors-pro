@@ -685,6 +685,7 @@
         <button id="toggleAlertsBtn" type="button">🔔 התראות</button>
         <button id="openPayModalBtn" type="button" class="btn-pay">💳 שדרוג / תשלום</button>
         <button id="whatsappBtn" type="button" class="btn-whatsapp">💬 שלח לוואטסאפ</button>
+        <a id="adminLink" href="admin.html" class="hidden" style="color:#fde68a;font-weight:700;text-decoration:none;">⚙️ ניהול</a>
         <button id="logoutBtn" type="button">יציאה</button>
       </div>
     </header>
@@ -952,6 +953,13 @@
         pill.className = "trial-pill expired";
         pill.textContent = "המנוי פג";
         summary.textContent = "תקופת המנוי הסתיימה. בחר מסלול כדי להמשיך.";
+        setLockedState(true);
+        return;
+      }
+      if (status !== "trial") {
+        pill.className = "trial-pill expired";
+        pill.textContent = "המנוי בוטל";
+        summary.textContent = "המנוי בוטל. בחר מסלול כדי לחדש.";
         setLockedState(true);
         return;
       }
@@ -1698,6 +1706,8 @@
         document.getElementById("authSection").classList.add("hidden");
         document.getElementById("appSection").classList.remove("hidden");
         document.getElementById("userEmailBadge").textContent = user.email || "";
+        // קישור לניהול מנויים - רק למנהל (ההרשאה עצמה נאכפת ב-firestore.rules)
+        document.getElementById("adminLink").classList.toggle("hidden", user.uid !== "TblW8UHDSBTh91BCJcqo3YKEqQJ3");
         bindUserListeners(user.uid);
       } else {
         if (unsubscribeTerminals) unsubscribeTerminals();

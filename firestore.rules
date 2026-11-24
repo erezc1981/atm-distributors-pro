@@ -22,6 +22,11 @@ service cloud.firestore {
       return request.time.toMillis();
     }
 
+    // מנהל המערכת (הבעלים) - מנהל מנויים של כל המפיצים
+    function isAdmin() {
+      return signedIn() && request.auth.uid == 'TblW8UHDSBTh91BCJcqo3YKEqQJ3';
+    }
+
     function profile(uid) {
       return get(/databases/$(database)/documents/distributors/$(uid)).data;
     }
@@ -46,7 +51,7 @@ service cloud.firestore {
     }
 
     match /distributors/{uid} {
-      allow read: if isOwner(uid);
+      allow read: if isOwner(uid) || isAdmin();
 
       // הרשמה: מותר ליצור רק פרופיל ניסיון של עד 30 יום, עם זמן יצירה אמיתי
       allow create: if isOwner(uid)
@@ -59,10 +64,30 @@ service cloud.firestore {
         && request.resource.data.trialEndsAt <= request.resource.data.createdAt + 30 * 86400000;
 
       // המשתמש לא יכול לשנות לעצמו מנוי/ניסיון/תוכנית - רק בקשת שדרוג
-      allow update: if isOwner(uid)
-        && changedKeys().hasOnly(['upgradeRequest', 'email']);
+      allow update: if (isOwner(uid)
+        && changedKeys().hasOnly(['upgradeRequest', 'email']))
+        || (isAdmin()
+        && changedKeys().hasOnly(['subscriptionStatus', 'currentPeriodEnd', 'plan', 'trialEndsAt', 'upgradeRequest', 'adminNote'])
+        && request.resource.data.get('subscriptionStatus', 'trial') in ['trial', 'active', 'canceled']
+        && (request.resource.data.get('currentPeriodEnd', null) == null || request.resource.data.currentPeriodEnd is int)
+        && (request.resource.data.get('trialEndsAt', null) == null || request.resource.data.trialEndsAt is int)
+        && request.resource.data.get('plan', '') in ['', 'monthly', 'yearly', 'owner_free']
+        && (!('adminNote' in changedKeys()) || (request.resource.data.adminNote is string && request.resource.data.adminNote.size() <= 500)));
 
       allow delete: if false;
+
+      // היסטוריית תשלומים: המנהל רושם, המפיץ רואה. אין עריכה או מחיקה.
+      match /payments/{pid} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create: if isAdmin()
+          && request.resource.data.keys().hasOnly(['amount', 'plan', 'periodEnd', 'paidAt', 'note'])
+          && request.resource.data.amount is number && request.resource.data.amount >= 0
+          && request.resource.data.plan in ['monthly', 'yearly', 'other']
+          && request.resource.data.periodEnd is int
+          && request.resource.data.paidAt is int
+          && (!('note' in request.resource.data) || (request.resource.data.note is string && request.resource.data.note.size() <= 200));
+        allow update, delete: if false;
+      }
 
       match /terminals/{tid} {
         allow read: if isOwner(uid);
@@ -105,7 +130,7 @@ service cloud.firestore {
       }
 
       match /settings/cas_sync {
-        allow read: if isOwner(uid);
+        allow read: if isOwner(uid) || isAdmin();  // המנהל רואה סטטוס סנכרון לצורך תמיכה
         // אין כתיבת סיסמה מהדפדפן; סטטוסי סנכרון נכתבים ע"י השרת
         // passwordEnc = סיסמה מוצפנת בדפדפן (RSA-OAEP, Base64); אין שדה סיסמה גלויה
         allow create: if isOwner(uid)
