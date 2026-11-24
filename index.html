@@ -299,7 +299,9 @@
     .rules-bar { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 12px; }
     .rule-row { display: flex; flex-direction: column; gap: 6px; }
     .rule-group-label { font-size: 0.8rem; font-weight: 800; color: var(--muted); }
-    .rule-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .rule-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .pct-field { display: inline-flex; align-items: center; gap: 4px; font-size: 0.85rem; color: var(--muted, #64748b); }
+    .pct-field input { width: 64px; padding: 6px 8px; border-radius: 999px; border: 1px solid var(--line, #cbd5e1); text-align: center; font: inherit; }
     .chip-btn {
       padding: 7px 12px;
       border-radius: 999px;
@@ -686,7 +688,7 @@
         </div>
       </div>
       <nav class="menu-list">
-        <button id="toggleRouteBtn" type="button" class="menu-item owner-only">📅 <span>ימי קו</span></button>
+        <button id="toggleRouteBtn" type="button" class="menu-item owner-only">📅 <span>ימי קו לחלוקה</span></button>
         <button id="toggleCasBtn" type="button" class="menu-item owner-only">🏦 <span>חיבור לכספונט</span></button>
         <button id="toggleAlertsBtn" type="button" class="menu-item owner-only">🔔 <span>התראות וואטסאפ</span></button>
         <button id="toggleDriversBtn" type="button" class="menu-item owner-only">👥 <span>עובדים</span></button>
@@ -699,11 +701,11 @@
     <div id="sheetBackdrop" class="sheet-backdrop hidden"></div>
 
     <main class="container">
-      <!-- הגדרת ימי קו -->
+      <!-- הגדרת ימי קו לחלוקה -->
       <section id="routePanel" class="panel sheet hidden">
-        <div class="sheet-head"><strong>📅 ימי קו</strong><button type="button" class="sheet-close" data-close-sheet aria-label="סגור">✕</button></div>
+        <div class="sheet-head"><strong>📅 ימי קו לחלוקה</strong><button type="button" class="sheet-close" data-close-sheet aria-label="סגור">✕</button></div>
         <div id="daysContainer" class="days-row"></div>
-        <button id="saveRouteBtn" type="button" class="btn-primary">שמור ימי קו</button>
+        <button id="saveRouteBtn" type="button" class="btn-primary">תשמור ימי קו חלוקה</button>
         <span id="routeSavedMsg" class="status-note"></span>
       </section>
 
@@ -802,6 +804,15 @@
               <span id="refillDayChips" class="rule-chips"></span>
             </div>
             <div id="rulesAutoNote" class="status-note" style="font-size:0.78rem;"></div>
+          </div>
+          <div class="rule-row">
+            <span class="rule-group-label">תוספת באחוזים (ידני)</span>
+            <div class="rule-chips">
+              <button type="button" class="chip-btn active" data-rule-group="extraPct" data-rule-val="0">ללא</button>
+              <button type="button" class="chip-btn" data-rule-group="extraPct" data-rule-val="25">+25%</button>
+              <button type="button" class="chip-btn" data-rule-group="extraPct" data-rule-val="50">+50%</button>
+              <label class="pct-field">אחר: <input id="extraPctInput" type="number" inputmode="numeric" step="5" min="-90" max="300" placeholder="0" />%</label>
+            </div>
           </div>
           <div class="rule-row">
             <span class="rule-group-label">תקופה בחודש</span>
@@ -983,7 +994,8 @@
       refillDay: String(new Date().getDay()),
       monthPeriod: "regular",
       jewishMode: "regular",
-      arabMode: "regular"
+      arabMode: "regular",
+      extraPct: "0"
     };
 
     function escapeHtml(val) {
@@ -1086,7 +1098,7 @@
     function getEffectiveTargetK(t) {
       if (!hasConfiguredTargetK(t)) return null;
       const baseK = Number(t.baseTargetK);
-      const dayPct = refillDayPct(Number(activeRules.refillDay));
+      const dayPct = manualExtraPct();
       const periodPct = Number(ADJUSTMENTS.monthPeriod?.[activeRules.monthPeriod] ?? 0);
       const sector = getTerminalSector(t);
       const sectorPct = sector === "arab"
@@ -1131,13 +1143,16 @@
         const v = btn.getAttribute("data-rule-val");
         const on = activeRules[grp] === v;
         btn.classList.toggle("active", on);
-        if (on && grp !== "refillDay" && v !== "regular") active.push(btn.textContent.trim());
+        if (on && grp !== "refillDay" && grp !== "extraPct" && v !== "regular") active.push(btn.textContent.trim());
       });
-      const dayIdx = Number(activeRules.refillDay);
-      if (Number.isInteger(dayIdx) && dayIdx >= 0 && dayIdx <= 6) {
-        const pct = refillDayPct(dayIdx);
-        active.unshift(`ביקור ${DAYS[dayIdx]}${pct ? ` +${pct}%` : ""}`);
+      const pct = manualExtraPct();
+      const pctInput = document.getElementById("extraPctInput");
+      if (pctInput && document.activeElement !== pctInput) {
+        pctInput.value = ["0", "25", "50"].includes(String(activeRules.extraPct ?? "0")) ? "" : String(pct);
       }
+      if (pct) active.unshift(`תוספת ${pct > 0 ? "+" : ""}${pct}%`);
+      const dayIdx = Number(activeRules.refillDay);
+      if (Number.isInteger(dayIdx) && dayIdx >= 0 && dayIdx <= 6) active.unshift(`ביקור ${DAYS[dayIdx]}`);
       // תקציר ההתאמות הפעילות בכותרת המקופלת
       const sum = document.getElementById("rulesSummary");
       if (sum) {
@@ -1167,13 +1182,20 @@
       ramadan: [["2027-02-08", "2027-03-08"]]                         // טווחי רמדאן
     };
 
-    // אחוז תוספת לפי כמה ימים הביקור צריך לכסות: עד יומיים - רגיל, כל יום נוסף +25% (כמו חמישי לסופ"ש)
-    function refillDayPct(dayIdx) {
-      if (!Number.isInteger(dayIdx) || !routeDays.includes(dayIdx)) return 0;
-      const days = [...new Set(routeDays)].sort((a, b) => a - b);
-      let cover = 7;
-      for (let i = 1; i <= 7; i++) if (days.includes((dayIdx + i) % 7)) { cover = i; break; }
-      return Math.max(0, cover - 2) * 25;
+    // תוספת באחוזים נקבעת רק ידנית (לא עולה אוטומטית בחמישי או בחגים)
+    function manualExtraPct() {
+      const n = Math.round(Number(activeRules.extraPct));
+      return Number.isFinite(n) ? Math.min(300, Math.max(-90, n)) : 0;
+    }
+
+    // רמז בלבד: איזה חג/מועד יוצא בתאריך הביקור (הבחירה עצמה ידנית)
+    function holidayHintFor(iso) {
+      const j = HOLIDAY_CALENDAR.jewish[iso];
+      if (j === "eve_holiday") return "ערב חג";
+      if (j === "holiday") return "חג";
+      if (HOLIDAY_CALENDAR.arabEves.includes(iso)) return "ערב עיד";
+      if (HOLIDAY_CALENDAR.ramadan.some(([a, b]) => iso >= a && iso <= b)) return "רמדאן";
+      return "";
     }
 
     // התאריך הקרוב (כולל היום) שבו יוצא יום השבוע הזה
@@ -1191,12 +1213,13 @@
       const date = visitDateFor(dayIdx);
       const iso = date.toLocaleDateString("en-CA");
       const dom = date.getDate();
-      const inRamadan = HOLIDAY_CALENDAR.ramadan.some(([a, b]) => iso >= a && iso <= b);
+      // חגים ותוספת באחוזים - לא אוטומטיים; רק התקופה בחודש נבחרת לפי התאריך
       return {
         refillDay: String(dayIdx),
         monthPeriod: dom >= 8 && dom <= 12 ? "salaries" : dom >= 26 && dom <= 29 ? "allowances" : "regular",
-        jewishMode: HOLIDAY_CALENDAR.jewish[iso] || "regular",
-        arabMode: HOLIDAY_CALENDAR.arabEves.includes(iso) ? "eve_eid" : inRamadan ? "ramadan" : "regular"
+        jewishMode: "regular",
+        arabMode: "regular",
+        extraPct: "0"
       };
     }
 
@@ -1220,17 +1243,21 @@
           refillDay: String(ov.refillDay ?? auto.refillDay),
           monthPeriod: ov.monthPeriod || auto.monthPeriod,
           jewishMode: ov.jewishMode || auto.jewishMode,
-          arabMode: ov.arabMode || auto.arabMode
+          arabMode: ov.arabMode || auto.arabMode,
+          extraPct: String(ov.extraPct ?? auto.extraPct)
         };
       } else {
         activeRules = auto;
       }
       const note = document.getElementById("rulesAutoNote");
       if (note) {
-        const shownIso = visitDateFor(Number(activeRules.refillDay)).toLocaleDateString("he-IL");
-        note.textContent = ov
-          ? `נבחר ידנית לביקור ב-${shownIso}. בתאריך הבא החישוב יחזור להיות אוטומטי.`
-          : `נבחר אוטומטית לפי תאריך הביקור (${shownIso}): יום, תקופה בחודש וחגים.`;
+        const visit = visitDateFor(Number(activeRules.refillDay));
+        const shownIso = visit.toLocaleDateString("he-IL");
+        const hint = holidayHintFor(visit.toLocaleDateString("en-CA"));
+        note.textContent = (ov
+          ? `נבחר ידנית לביקור ב-${shownIso}. בתאריך הבא החישוב יחזור לברירת המחדל.`
+          : `ביקור ב-${shownIso}: יום ותקופה בחודש נבחרו לפי התאריך. חגים ותוספת באחוזים - בחירה ידנית.`)
+          + (hint ? ` 💡 בתאריך הזה: ${hint} - אפשר לבחור ידנית למטה.` : "");
       }
       syncRuleChipButtons();
       updateStatsAndList(currentTerminals);
@@ -1240,10 +1267,9 @@
       const wrap = document.getElementById("refillDayChips");
       if (!wrap) return;
       const days = [...new Set(routeDays)].sort((a, b) => a - b);
-      wrap.innerHTML = days.map((d) => {
-        const pct = refillDayPct(d);
-        return `<button type="button" class="chip-btn" data-rule-group="refillDay" data-rule-val="${d}">${DAYS[d]}${pct ? ` +${pct}%` : ""}</button>`;
-      }).join("") || `<span class="status-note">לא הוגדרו ימי קו (תפריט ← ימי קו)</span>`;
+      wrap.innerHTML = days.map((d) =>
+        `<button type="button" class="chip-btn" data-rule-group="refillDay" data-rule-val="${d}">${DAYS[d]}</button>`
+      ).join("") || `<span class="status-note">לא הוגדרו ימי קו לחלוקה (תפריט ← ימי קו לחלוקה)</span>`;
     }
 
     async function saveRulesOverride() {
@@ -1706,6 +1732,17 @@
       saveRulesOverride();
     });
 
+    // אחוז ידני חופשי (שדה "אחר")
+    document.getElementById("extraPctInput").addEventListener("change", (e) => {
+      const raw = String(e.target.value || "").trim();
+      const n = raw === "" ? 0 : Math.round(Number(raw));
+      if (!Number.isFinite(n)) return;
+      activeRules.extraPct = String(Math.min(300, Math.max(-90, n)));
+      syncRuleChipButtons();
+      updateStatsAndList(currentTerminals);
+      saveRulesOverride();
+    });
+
     async function triggerCasSync(uid) {
       if (!uid || !subscriptionValid) return;
       const casDocRef = db.collection("distributors").doc(uid).collection("settings").doc("cas_sync");
@@ -1722,7 +1759,8 @@
         syncRequestedAt: Date.now(),
       }, { merge: true });
 
-      statusEl.textContent = "הבקשה נרשמה. הסנכרון הבא יתבצע תוך כ-30 דקות.";
+      statusEl.textContent = "הבקשה נרשמה. מסנכרן מול כספונט...";
+      requestLiveSync(true);
     }
 
     function bindUserListeners(uid) {
@@ -1840,19 +1878,51 @@
       updateStatsAndList(currentTerminals);
     });
 
-    // "רענן" טוען מחדש את הנתונים מהשרת. הסנכרון מול כספונט עצמו רץ אוטומטית כל 30 דקות.
+    // ---------- סנכרון מול כספונט: בכל כניסה לאתר/לאפליקציה ובלחיצה על "רענן" ----------
+    // הבקשה נשלחת לשרת ממסר קטן (Cloudflare Worker) שמאמת את המשתמש ומפעיל את ריצת הסנכרון.
+    const SYNC_RELAY_URL = ""; // יוגדר אחרי הקמת השרת הממסר
+    const AUTO_SYNC_MIN_GAP_MS = 5 * 60 * 1000; // בכניסה: לא מסנכרנים שוב אם עודכן ב-5 הדקות האחרונות
+    let lastSyncRequestMs = 0;
+
+    async function requestLiveSync(manual) {
+      if (!currentUser || !dataUid) return;
+      const now = Date.now();
+      if (!manual && (now - lastSyncedAtMs < AUTO_SYNC_MIN_GAP_MS || now - lastSyncRequestMs < AUTO_SYNC_MIN_GAP_MS)) return;
+      if (now - lastSyncRequestMs < 60 * 1000) {
+        if (manual) showToast("הסנכרון כבר בדרך - הנתונים יתעדכנו תוך כדקה.");
+        return;
+      }
+      if (!SYNC_RELAY_URL) {
+        if (manual) showToast("הנתונים נטענו מחדש. סנכרון מיידי מול כספונט יופעל אחרי הקמת השרת הממסר.");
+        return;
+      }
+      lastSyncRequestMs = now;
+      try {
+        const token = await currentUser.getIdToken();
+        const res = await fetch(SYNC_RELAY_URL, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+        const out = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(out.error || `HTTP ${res.status}`);
+        if (manual || out.started) showToast(out.started ? "🔄 מסנכרן מול כספונט... הנתונים יתעדכנו תוך כדקה." : "הסנכרון כבר רץ - הנתונים יתעדכנו תוך כדקה.");
+      } catch (err) {
+        lastSyncRequestMs = 0;
+        if (manual) showToast("הפעלת הסנכרון נכשלה. נסה שוב בעוד רגע.");
+        console.warn("sync relay:", err && err.message);
+      }
+    }
+
+    // חזרה לאפליקציה מהרקע = כניסה מחדש
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") requestLiveSync(false);
+    });
+
     document.getElementById("refreshBtn").addEventListener("click", async () => {
       const btn = document.getElementById("refreshBtn");
       btn.disabled = true;
       try {
         if (currentUser && dataUid) {
           bindUserListeners(dataUid);
-          if (userRole === "owner") triggerCasSync(dataUid).catch(() => {});
+          await requestLiveSync(true);
         }
-        const ago = lastSyncedAtMs ? relativeTimeHe(lastSyncedAtMs) : "";
-        showToast(ago
-          ? `הנתונים עודכנו מכספונט ${ago}. הסנכרון רץ אוטומטית כל 30 דקות.`
-          : "הנתונים נטענו מחדש. הסנכרון מול כספונט רץ אוטומטית כל 30 דקות.");
       } finally {
         setTimeout(() => { btn.disabled = false; }, 800);
       }
@@ -1974,7 +2044,7 @@
           updatedAt: Date.now()
         }, { merge: true });
       } catch (err) {
-        alert("שמירת ימי הקו נכשלה: " + errorHe(err, err && err.message));
+        alert("שמירת ימי הקו לחלוקה נכשלה: " + errorHe(err, err && err.message));
         return;
       }
       routeDays = days;
@@ -2016,8 +2086,8 @@
       passInput.value = "";
 
       document.getElementById("casSyncStatus").textContent = plainPass
-        ? "הפרטים נשמרו (הסיסמה מוצפנת). המסופים יסונכרנו מכספונט תוך כ-30 דקות."
-        : "שם המשתמש נשמר. המסופים יסונכרנו מכספונט תוך כ-30 דקות.";
+        ? "הפרטים נשמרו (הסיסמה מוצפנת). המסופים יסונכרנו מכספונט בכניסה הבאה או בלחיצה על רענן."
+        : "שם המשתמש נשמר. המסופים יסונכרנו מכספונט בכניסה הבאה או בלחיצה על רענן.";
     });
 
     document.getElementById("whatsappBtn").addEventListener("click", () => {
@@ -2153,6 +2223,8 @@
       document.getElementById("verifyBanner").classList.toggle("hidden", !needVerify);
       bindUserListeners(dataUid);
       if (userRole === "owner") loadDrivers().catch(() => {});
+      // כניסה לאתר/לאפליקציה: מסנכרנים (אחרי שזמן הסנכרון האחרון נטען, כדי לא לסנכרן סתם)
+      setTimeout(() => requestLiveSync(false), 2500);
     }
 
     document.getElementById("resendVerifyBtn").addEventListener("click", async () => {
