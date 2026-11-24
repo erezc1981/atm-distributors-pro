@@ -652,11 +652,11 @@
       <span class="atm-tag">ATM</span>
       <span>ניהול קו כספומטים</span>
     </div>
-    <p class="status-note" style="margin:0">התחבר לחשבון המפיץ או הירשם ל-14 ימי ניסיון.</p>
+    <p class="status-note" style="margin:0">התחבר לחשבון המפיץ או הירשם לחודש ניסיון חינם.</p>
     <input id="emailInput" type="email" placeholder="אימייל" autocomplete="email" />
     <input id="passwordInput" type="password" placeholder="סיסמה (לפחות 6 תווים)" autocomplete="current-password" />
     <button id="loginBtn" type="button" class="btn-primary">התחברות</button>
-    <button id="registerBtn" type="button">הרשמה + 14 יום חינם</button>
+    <button id="registerBtn" type="button">הרשמה + חודש ניסיון חינם</button>
     <div id="authError" style="color:#b91c1c;font-size:0.88rem;"></div>
   </div>
 
@@ -672,7 +672,7 @@
           <span>ניהול קו כספומטים</span>
         </div>
         <span class="auto-pill">מצב אוטומטי פעיל</span>
-        <span id="trialDaysPill" class="trial-pill">ניסיון: 14 ימים</span>
+        <span id="trialDaysPill" class="trial-pill">ניסיון: 30 ימים</span>
         <span id="lastSyncPill" class="sync-pill">ממתין לסנכרון...</span>
         <span id="userEmailBadge" class="sync-pill"></span>
       </div>
@@ -682,6 +682,7 @@
         <button id="refreshBtn" type="button">🔄 רענן</button>
         <button id="toggleRouteBtn" type="button">📅 ימי קו</button>
         <button id="toggleCasBtn" type="button">🏦 כספונט</button>
+        <button id="toggleAlertsBtn" type="button">🔔 התראות</button>
         <button id="openPayModalBtn" type="button" class="btn-pay">💳 שדרוג / תשלום</button>
         <button id="whatsappBtn" type="button" class="btn-whatsapp">💬 שלח לוואטסאפ</button>
         <button id="logoutBtn" type="button">יציאה</button>
@@ -700,6 +701,10 @@
       <!-- הגדרות וסנכרון כספונט -->
       <section id="casPanel" class="panel hidden">
         <strong>חיבור וסנכרון CASMobile (casmobile.co.il)</strong>
+        <p class="status-note" style="margin:8px 0 0;">
+          💡 מומלץ להזין <b>יוזר מפתחות</b> (אפשר לבקש מכספונט) ולא את היוזר שאתה נכנס איתו לאתר:
+          כך תקלה בסנכרון לא תנעל אותך מהאתר. אחרי כישלון התחברות הסנכרון נעצר עד שתלחץ "שמור" שוב.
+        </p>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:10px 0;">
           <input id="casUserInput" type="text" placeholder="שם משתמש בכספונט" autocomplete="username" />
           <input id="casPassInput" type="password" placeholder="סיסמת כספונט (נשמרת מוצפנת)" autocomplete="new-password" />
@@ -707,6 +712,23 @@
         <div id="casPassState" class="status-note" style="margin-bottom:8px;">🔒 הסיסמה מוצפנת בדפדפן לפני השמירה, ורק שרת הסנכרון יכול לפענח אותה.</div>
         <button id="saveAndSyncCasBtn" type="button" class="btn-primary">שמור ובקש סנכרון מכספונט</button>
         <div id="casSyncStatus" class="status-note" style="margin-top:8px;"></div>
+      </section>
+
+      <!-- התראות וואטסאפ -->
+      <section id="alertsPanel" class="panel hidden">
+        <strong>התראות וואטסאפ על יתרה נמוכה</strong>
+        <p class="status-note" style="margin:8px 0;">
+          כשמסוף יורד מתחת לסף ההתראה שלו תישלח הודעה (לכל היותר פעם ב-4 שעות למסוף, ומיד אם הוא התרוקן).
+        </p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:10px 0;align-items:center;">
+          <input id="alertPhoneInput" type="tel" placeholder="מספר וואטסאפ, למשל 0501234567" autocomplete="tel" />
+          <label class="day-chip"><input id="alertEnabledInput" type="checkbox" checked style="width:auto;" /> התראות פעילות</label>
+        </div>
+        <button id="saveAlertsBtn" type="button" class="btn-primary">שמור התראות</button>
+        <span id="alertsSavedMsg" class="status-note"></span>
+        <div style="margin-top:10px;">
+          <label class="day-chip"><input id="showHiddenInput" type="checkbox" style="width:auto;" /> הצג מסופים מוסתרים</label>
+        </div>
       </section>
 
       <!-- סיכום ראשי -->
@@ -831,7 +853,7 @@
     const db = firebase.firestore();
 
     const DAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
-    const TRIAL_DAYS_DEFAULT = 14;
+    const TRIAL_DAYS_DEFAULT = 30;
 
     const ADJUSTMENTS = {
       refillDay: { midweek: 0, thursday: 25 },
@@ -850,7 +872,7 @@
     let subscriptionValid = true;
 
     // מפתח ציבורי להצפנת סיסמת כספונט (RSA-OAEP SHA-256). המפתח הפרטי נמצא רק ב-GitHub Secret של הסנכרון.
-    const CAS_PUBLIC_KEY_B64 = "MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEArfSAYK/GvOSm5BRO+YUHK4jxF9fUXq0Q8vJYjG3ulRBmpUaxSHBmSTNLBITUP3U0paPmKkJ7rvQaz+0Z8Fl5qqpTG29n78xqc4PQbho1jsuiMfow6E+6Kws7UhKKN6bj+uj5B8jFO8a1pCMI+t5OEcdP231zr8kG7GlYj6sgOG7O6v4XkP6hbhyF7VGdOvaSSn84VzDlU0HI7wwZgyp2QedKj+e7pd8EOumPnyc6beY0RA+YyRKgzlYa6QmXSGNnJ4bVosGIpajjjKWqSxKkoYOtOANAy16qAtliCftShteHScZO3+PAoOJ20ZxsHRmE/YHnYNK+fcy/uTl2iKk5WO1+BQ5VyItqo162ruZmLReYHw8jJBqKIjXB70jln9xnuBpmqf51pIjkpFRRk1OEvz2WCi6OVcZ2WNImBHS5gnipFdr6kUEEnOdH8gjxzQECna+ZRKNqiBDRMuOCdzua8nJgQkcp2Lgte+aPOTqRjZ25Bk4/gWc7R7gQV+Yj82aJAgMBAAE=";
+    const CAS_PUBLIC_KEY_B64 = "MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEA0JPcLc3Y/GaNa1vh3gI4vi0hAUWaBe8SgLPWXcPDHghJ10PId5XaV6XNDPvwqb3r7BHmZOpS2hphfYNBmq3HE2od3SnUT92lnZTDHW0dFHQ7AOJQqt6bL9OCzvUDZiViQy3dsKPIFoZ5j8Jk4A28yQ6vPikNymqrS0BS6dtGYNNpWkVSK6jOfzHBx1d3cHzdeSAdwJkSNpCaVELReKxbyZxsYcNV2xHIosQPc2C4uNfKsjuaeftZaajByXCZcNpt4Jk1GElyuysq7kawU+wP2tQEpFmWAe6XL7zP2BV8ddPxccbaUt9slUcrujCpGSmmns3nHvISrq1tH7O8VLJr9m205Rtx6YsJ0RWmB6arWWfIn9cN/CK4vAjk9ywVNA7GZAT22wcbyJq1ATVw1t9JlrC9O8i6NjK1sFsQDxISOxV9KlVFD0aoGc7Ydo0k8aVEalSAGibrKz7y+PxkifIxAj7jP6L6O+1Si8nFY9klvj2IH/E1bvvui5Ra7dj1hhRXAgMBAAE=";
 
     async function encryptCasPassword(plain) {
       const der = Uint8Array.from(atob(CAS_PUBLIC_KEY_B64), (c) => c.charCodeAt(0));
@@ -1065,10 +1087,11 @@
         fillDisplayHtml = `<span class="fill-display ok-badge">תקין (0)</span>`;
       }
 
+      const isHidden = Boolean(t.hidden);
       const cardClasses = [
         "terminal-card",
-        isAlert ? "" : "ok",
-        isDone ? "done" : ""
+        isAlert && !isHidden ? "" : "ok",
+        isDone || isHidden ? "done" : ""
       ].filter(Boolean).join(" ");
 
       return `
@@ -1090,6 +1113,9 @@
                   title="${paperNeeded ? "מסומן שנגמר גליל קבלות - לחץ לביטול" : "סמן שנגמר גליל קבלות וצריך להחליף"}"
                   onclick="togglePaperRoll('${safeIdAttr}')"
                 >🧻 נייר${paperNeeded ? " — להחלפה" : ""}</button>
+                <button type="button" class="paper-btn" title="הזז למעלה במסלול" onclick="moveTerminal('${safeIdAttr}', -1)">▲</button>
+                <button type="button" class="paper-btn" title="הזז למטה במסלול" onclick="moveTerminal('${safeIdAttr}', 1)">▼</button>
+                <button type="button" class="paper-btn" title="${isHidden ? "החזר מסוף לרשימה" : "הסתר מסוף (לא ייספר בסיכומים ובהתראות)"}" onclick="toggleHidden('${safeIdAttr}')">${isHidden ? "👁 הצג" : "🙈 הסתר"}</button>
               </div>
               <div class="terminal-meta">
                 <span>מזהה: ${safeIdText}</span>
@@ -1152,13 +1178,23 @@
       `;
     }
 
-    function updateStatsAndList(terminals) {
+    function updateStatsAndList(allTerminals) {
+      // מסופים מוסתרים לא נספרים בסיכומים ובהתראות; מוצגים רק כשמסמנים "הצג מסופים מוסתרים"
+      const showHidden = document.getElementById("showHiddenInput").checked;
+      const terminals = allTerminals.filter((t) => !t.hidden);
+      const listSource = showHidden ? allTerminals : terminals;
       const jewishTotal = terminals.filter((t) => getTerminalSector(t) === "jewish").length;
       const arabTotal = terminals.filter((t) => getTerminalSector(t) === "arab").length;
       document.getElementById("jewishCountLabel").textContent = `מגזר יהודי (${jewishTotal}):`;
       document.getElementById("arabCountLabel").textContent = `מגזר ערבי (${arabTotal}):`;
 
       const q = searchQuery.trim().toLowerCase();
+      const matches = (t) =>
+        !q ||
+        String(t.name || "").toLowerCase().includes(q) ||
+        String(t.id || "").toLowerCase().includes(q) ||
+        String(t.notes || "").toLowerCase().includes(q);
+      const listed = listSource.filter(matches);
       const filtered = q
         ? terminals.filter(
             (t) =>
@@ -1169,10 +1205,10 @@
         : terminals;
 
       const listEl = document.getElementById("terminalsList");
-      if (!filtered.length) {
+      if (!listed.length) {
         listEl.innerHTML = `<div class="panel status-note">אין מסופים להצגה. לחץ על "כספונט" או "רענן" כדי לסנכרן מול כספונט.</div>`;
       } else {
-        listEl.innerHTML = filtered.map((t, idx) => renderTerminalCard(t, idx)).join("");
+        listEl.innerHTML = listed.map((t, idx) => renderTerminalCard(t, idx)).join("");
       }
 
       const totalBalance = filtered.reduce((acc, t) => acc + Number(t.balance ?? 0), 0);
@@ -1232,6 +1268,38 @@
         .collection("terminals")
         .doc(String(terminalId))
         .set({ paperRollNeeded: nextState }, { merge: true });
+    };
+
+    window.toggleHidden = async function (terminalId) {
+      if (!guardWrite()) return;
+      const t = currentTerminals.find((x) => String(x.id) === String(terminalId));
+      if (!t) return;
+      await db
+        .collection("distributors")
+        .doc(currentUser.uid)
+        .collection("terminals")
+        .doc(String(terminalId))
+        .set({ hidden: !Boolean(t.hidden) }, { merge: true });
+    };
+
+    // שינוי סדר המסלול: מחליף מקום עם המסוף הסמוך ושומר סדר רציף 1..N
+    window.moveTerminal = async function (terminalId, dir) {
+      if (!guardWrite()) return;
+      const list = [...currentTerminals];
+      const idx = list.findIndex((x) => String(x.id) === String(terminalId));
+      const target = idx + dir;
+      if (idx < 0 || target < 0 || target >= list.length) return;
+      [list[idx], list[target]] = [list[target], list[idx]];
+      const batch = db.batch();
+      const col = db.collection("distributors").doc(currentUser.uid).collection("terminals");
+      list.forEach((t, i) => {
+        if (Number(t.order) !== i + 1) batch.set(col.doc(String(t.id)), { order: i + 1 }, { merge: true });
+      });
+      try {
+        await batch.commit();
+      } catch (err) {
+        alert("שינוי הסדר נכשל: " + (err && err.message ? err.message : String(err)));
+      }
     };
 
     window.editTerminalThreshold = async function (terminalId) {
@@ -1348,10 +1416,9 @@
       await casDocRef.set({
         syncRequested: false,
         syncRequestedAt: Date.now(),
-        lastSyncError: ""
       }, { merge: true });
 
-      statusEl.textContent = "הבקשה נרשמה. להפעלה מיידית של המשיכה מכספונט הרץ את ה-Workflow ב-GitHub Actions (או המתן להרצה המתוזמנת).";
+      statusEl.textContent = "הבקשה נרשמה. הסנכרון הבא יתבצע תוך כ-30 דקות.";
     }
 
     function bindUserListeners(uid) {
@@ -1370,6 +1437,12 @@
         const days = snap.exists && Array.isArray(snap.data().days) ? snap.data().days : [0, 2, 4];
         renderDaysSelector(days);
       });
+
+      userRef.collection("settings").doc("alerts").get().then((snap) => {
+        const data = snap.exists ? (snap.data() || {}) : {};
+        document.getElementById("alertPhoneInput").value = data.phone || "";
+        document.getElementById("alertEnabledInput").checked = data.enabled !== false;
+      }).catch(() => {});
 
       unsubscribeCas = userRef.collection("settings").doc("cas_sync").onSnapshot((snap) => {
         const statusEl = document.getElementById("casSyncStatus");
@@ -1508,6 +1581,34 @@
       document.getElementById("casPanel").classList.toggle("hidden");
     });
 
+    document.getElementById("toggleAlertsBtn").addEventListener("click", () => {
+      document.getElementById("alertsPanel").classList.toggle("hidden");
+    });
+
+    document.getElementById("showHiddenInput").addEventListener("change", () => {
+      updateStatsAndList(currentTerminals);
+    });
+
+    document.getElementById("saveAlertsBtn").addEventListener("click", async () => {
+      if (!guardWrite()) return;
+      const phone = document.getElementById("alertPhoneInput").value.replace(/[^\d+]/g, "");
+      if (phone && phone.replace(/\D/g, "").length < 9) {
+        alert("מספר הטלפון לא תקין");
+        return;
+      }
+      try {
+        await db.collection("distributors").doc(currentUser.uid).collection("settings").doc("alerts").set({
+          phone,
+          enabled: document.getElementById("alertEnabledInput").checked,
+          updatedAt: Date.now()
+        });
+        document.getElementById("alertsSavedMsg").textContent = "נשמר";
+        setTimeout(() => { document.getElementById("alertsSavedMsg").textContent = ""; }, 2000);
+      } catch (err) {
+        alert("השמירה נכשלה: " + (err && err.message ? err.message : String(err)));
+      }
+    });
+
     document.getElementById("saveRouteBtn").addEventListener("click", async () => {
       if (!guardWrite()) return;
       const days = [...document.querySelectorAll("#daysContainer input:checked")].map((el) => Number(el.value));
@@ -1551,16 +1652,17 @@
       passInput.value = "";
 
       document.getElementById("casSyncStatus").textContent = plainPass
-        ? "הפרטים נשמרו (הסיסמה מוצפנת). המסופים יסונכרנו מכספונט תוך כ-15 דקות."
-        : "שם המשתמש נשמר. המסופים יסונכרנו מכספונט תוך כ-15 דקות.";
+        ? "הפרטים נשמרו (הסיסמה מוצפנת). המסופים יסונכרנו מכספונט תוך כ-30 דקות."
+        : "שם המשתמש נשמר. המסופים יסונכרנו מכספונט תוך כ-30 דקות.";
     });
 
     document.getElementById("whatsappBtn").addEventListener("click", () => {
-      const totalToLoad = currentTerminals.reduce(
+      const visibleTerminals = currentTerminals.filter((t) => !t.hidden);
+      const totalToLoad = visibleTerminals.reduce(
         (acc, t) => acc + (t.refilled ? 0 : calcLoadAmountILS(t.balance, getEffectiveTargetK(t))),
         0
       );
-      const totalTxMidnight = currentTerminals.reduce(
+      const totalTxMidnight = visibleTerminals.reduce(
         (acc, t) => acc + getTerminalTxMidnight(t),
         0
       );
@@ -1570,7 +1672,7 @@
         `סה"כ להטענה: ₪${formatAmountILS(totalToLoad)} | חבילות 5K מהבנק: ${totalPacks5k} | עסקאות מחצות: ${formatAmountILS(totalTxMidnight)}`,
         ""
       ];
-      currentTerminals.forEach((t, idx) => {
+      visibleTerminals.forEach((t, idx) => {
         const targetK = getEffectiveTargetK(t);
         const loadAmt = t.refilled ? 0 : calcLoadAmountILS(t.balance, targetK);
         const targetLabel = targetK !== null ? `${targetK}K` : "לא הוגדר";
