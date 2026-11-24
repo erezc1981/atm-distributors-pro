@@ -702,7 +702,9 @@
         <strong>חיבור וסנכרון CASMobile (casmobile.co.il)</strong>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:10px 0;">
           <input id="casUserInput" type="text" placeholder="שם משתמש בכספונט" autocomplete="username" />
+          <input id="casPassInput" type="password" placeholder="סיסמת כספונט (נשמרת מוצפנת)" autocomplete="new-password" />
         </div>
+        <div id="casPassState" class="status-note" style="margin-bottom:8px;">🔒 הסיסמה מוצפנת בדפדפן לפני השמירה, ורק שרת הסנכרון יכול לפענח אותה.</div>
         <button id="saveAndSyncCasBtn" type="button" class="btn-primary">שמור ובקש סנכרון מכספונט</button>
         <div id="casSyncStatus" class="status-note" style="margin-top:8px;"></div>
       </section>
@@ -846,6 +848,18 @@
     let unsubscribeProfile = null;
     let selectedPlan = { id: "monthly", label: "חודשי (₪99 / חודש)" };
     let subscriptionValid = true;
+
+    // מפתח ציבורי להצפנת סיסמת כספונט (RSA-OAEP SHA-256). המפתח הפרטי נמצא רק ב-GitHub Secret של הסנכרון.
+    const CAS_PUBLIC_KEY_B64 = "MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEArfSAYK/GvOSm5BRO+YUHK4jxF9fUXq0Q8vJYjG3ulRBmpUaxSHBmSTNLBITUP3U0paPmKkJ7rvQaz+0Z8Fl5qqpTG29n78xqc4PQbho1jsuiMfow6E+6Kws7UhKKN6bj+uj5B8jFO8a1pCMI+t5OEcdP231zr8kG7GlYj6sgOG7O6v4XkP6hbhyF7VGdOvaSSn84VzDlU0HI7wwZgyp2QedKj+e7pd8EOumPnyc6beY0RA+YyRKgzlYa6QmXSGNnJ4bVosGIpajjjKWqSxKkoYOtOANAy16qAtliCftShteHScZO3+PAoOJ20ZxsHRmE/YHnYNK+fcy/uTl2iKk5WO1+BQ5VyItqo162ruZmLReYHw8jJBqKIjXB70jln9xnuBpmqf51pIjkpFRRk1OEvz2WCi6OVcZ2WNImBHS5gnipFdr6kUEEnOdH8gjxzQECna+ZRKNqiBDRMuOCdzua8nJgQkcp2Lgte+aPOTqRjZ25Bk4/gWc7R7gQV+Yj82aJAgMBAAE=";
+
+    async function encryptCasPassword(plain) {
+      const der = Uint8Array.from(atob(CAS_PUBLIC_KEY_B64), (c) => c.charCodeAt(0));
+      const key = await crypto.subtle.importKey("spki", der, { name: "RSA-OAEP", hash: "SHA-256" }, false, ["encrypt"]);
+      const enc = await crypto.subtle.encrypt({ name: "RSA-OAEP" }, key, new TextEncoder().encode(plain));
+      let bin = "";
+      new Uint8Array(enc).forEach((b) => { bin += String.fromCharCode(b); });
+      return btoa(bin);
+    }
     const SAFE_TERMINAL_ID = /^[A-Za-z0-9_-]{1,40}$/;
 
     // חוסם עריכה כשהמנוי/הניסיון הסתיים (האכיפה האמיתית נמצאת ב-firestore.rules)
@@ -1369,6 +1383,9 @@
         if (data.username && !document.getElementById("casUserInput").value) {
           document.getElementById("casUserInput").value = data.username;
         }
+        document.getElementById("casPassState").textContent = data.passwordEnc
+          ? "🔒 סיסמה שמורה (מוצפנת). להחלפה - הזן סיסמה חדשה ושמור."
+          : "🔒 הסיסמה מוצפנת בדפדפן לפני השמירה, ורק שרת הסנכרון יכול לפענח אותה.";
         if (data.syncRequested) {
           statusEl.textContent = "בקשת סנכרון מכספונט פעילה — מסנכרן כעת מול כספונט...";
           pillEl.textContent = "מסנכרן כעת...";
@@ -1505,18 +1522,37 @@
     document.getElementById("saveAndSyncCasBtn").addEventListener("click", async () => {
       if (!guardWrite()) return;
       const username = document.getElementById("casUserInput").value.trim();
+      const passInput = document.getElementById("casPassInput");
+      const plainPass = passInput.value;
       if (!username) {
         alert("יש להזין שם משתמש של כספונט");
         return;
       }
-      await db.collection("distributors").doc(currentUser.uid).collection("settings").doc("cas_sync").set({
+      const payload = {
         username,
         syncRequested: false,
         syncRequestedAt: Date.now(),
         updatedAt: Date.now()
-      }, { merge: true });
+      };
+      if (plainPass) {
+        try {
+          payload.passwordEnc = await encryptCasPassword(plainPass);
+        } catch (err) {
+          alert("הצפנת הסיסמה נכשלה. נסה שוב מדפדפן מעודכן.");
+          return;
+        }
+      }
+      try {
+        await db.collection("distributors").doc(currentUser.uid).collection("settings").doc("cas_sync").set(payload, { merge: true });
+      } catch (err) {
+        alert("השמירה נכשלה: " + (err && err.message ? err.message : String(err)));
+        return;
+      }
+      passInput.value = "";
 
-      document.getElementById("casSyncStatus").textContent = "שם המשתמש נשמר. להפעלה מיידית של המשיכה מכספונט הרץ את ה-Workflow ב-GitHub Actions.";
+      document.getElementById("casSyncStatus").textContent = plainPass
+        ? "הפרטים נשמרו (הסיסמה מוצפנת). המסופים יסונכרנו מכספונט תוך כ-15 דקות."
+        : "שם המשתמש נשמר. המסופים יסונכרנו מכספונט תוך כ-15 דקות.";
     });
 
     document.getElementById("whatsappBtn").addEventListener("click", () => {
