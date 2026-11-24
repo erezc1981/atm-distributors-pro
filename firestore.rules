@@ -1,0 +1,116 @@
+rules_version = '2';
+
+// כללי אבטחה ל-Cloud Firestore של atm-distributors-pro
+// פריסה: Firebase Console > Firestore Database > Rules > הדבקה > Publish
+// (סקריפטי ה-Python עובדים עם Service Account ולכן לא מושפעים מהכללים האלה)
+//
+// לפני הפריסה: במסמך distributors/<ה-UID שלך> הוסף שדה plan = "owner_free"
+// אחרת החשבון שלך יינעל לעריכה כשתקופת הניסיון שלו תסתיים.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function nowMs() {
+      return request.time.toMillis();
+    }
+
+    function profile(uid) {
+      return get(/databases/$(database)/documents/distributors/$(uid)).data;
+    }
+
+    // מנוי בתוקף: בעלים / מנוי פעיל / ניסיון שלא פג
+    function hasValidSub(uid) {
+      let p = profile(uid);
+      return p.get('plan', '') == 'owner_free'
+        || (p.get('subscriptionStatus', '') == 'active'
+            && (p.get('currentPeriodEnd', null) == null || nowMs() <= p.get('currentPeriodEnd', 0)))
+        || (p.get('subscriptionStatus', '') == 'trial'
+            && nowMs() <= p.get('trialEndsAt', 0));
+    }
+
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    match /distributors/{uid} {
+      allow read: if isOwner(uid);
+
+      // הרשמה: מותר ליצור רק פרופיל ניסיון של עד 14 יום, עם זמן יצירה אמיתי
+      allow create: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(['email', 'subscriptionStatus', 'createdAt', 'trialEndsAt'])
+        && request.resource.data.subscriptionStatus == 'trial'
+        && request.resource.data.createdAt is int
+        && request.resource.data.trialEndsAt is int
+        && request.resource.data.createdAt > nowMs() - 3600000
+        && request.resource.data.createdAt < nowMs() + 3600000
+        && request.resource.data.trialEndsAt <= request.resource.data.createdAt + 14 * 86400000;
+
+      // המשתמש לא יכול לשנות לעצמו מנוי/ניסיון/תוכנית - רק בקשת שדרוג
+      allow update: if isOwner(uid)
+        && changedKeys().hasOnly(['upgradeRequest', 'email']);
+
+      allow delete: if false;
+
+      match /terminals/{tid} {
+        allow read: if isOwner(uid);
+        // מסופים נוצרים ע"י הסנכרון בלבד; המפיץ עורך רק את שדות הניהול שלו
+        allow create, delete: if false;
+        allow update: if isOwner(uid)
+          && hasValidSub(uid)
+          && changedKeys().hasOnly([
+               'sector', 'paperRollNeeded', 'threshold', 'notes',
+               'baseTargetK', 'refilled', 'lastRefilledAt'
+             ])
+          && (!('notes' in changedKeys()) || (request.resource.data.notes is string && request.resource.data.notes.size() <= 500))
+          && (!('threshold' in changedKeys()) || (request.resource.data.threshold is number && request.resource.data.threshold >= 0))
+          && (!('baseTargetK' in changedKeys()) || request.resource.data.baseTargetK == null
+              || (request.resource.data.baseTargetK is number && request.resource.data.baseTargetK >= 0 && request.resource.data.baseTargetK <= 1000))
+          && (!('sector' in changedKeys()) || request.resource.data.sector in ['jewish', 'arab', 'none']);
+      }
+
+      match /settings/route {
+        allow read: if isOwner(uid);
+        allow write: if isOwner(uid)
+          && hasValidSub(uid)
+          && request.resource.data.keys().hasOnly(['days', 'updatedAt'])
+          && request.resource.data.days is list
+          && request.resource.data.days.size() <= 7;
+      }
+
+      match /settings/cas_sync {
+        allow read: if isOwner(uid);
+        // אין כתיבת סיסמה מהדפדפן; סטטוסי סנכרון נכתבים ע"י השרת
+        allow create: if isOwner(uid)
+          && hasValidSub(uid)
+          && request.resource.data.keys()
+               .hasOnly(['username', 'syncRequested', 'syncRequestedAt', 'updatedAt', 'lastSyncError'])
+          && (!('lastSyncError' in request.resource.data) || request.resource.data.lastSyncError == '');
+        allow update: if isOwner(uid)
+          && hasValidSub(uid)
+          && changedKeys()
+               .hasOnly(['username', 'syncRequested', 'syncRequestedAt', 'updatedAt', 'lastSyncError'])
+          && (!('lastSyncError' in changedKeys()) || request.resource.data.lastSyncError == '');
+        allow delete: if false;
+      }
+
+      // alert_state ומסמכים אחרים - שרת בלבד
+      match /settings/{other} {
+        allow read: if isOwner(uid) && other != 'alert_state';
+        allow write: if false;
+      }
+    }
+
+    // כל השאר חסום
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
