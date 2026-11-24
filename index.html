@@ -173,32 +173,46 @@
     .chip-danger { background: rgba(254, 202, 202, 0.2); color: #fee2e2; }
 
     /* כרטיס סיכום */
+    /* בטלפון: כרטיס סיכום קומפקטי (שורה ראשית + שורת צ'יפים + שורת סיכומים קטנה) */
     .summary-card {
       background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
       color: #fff;
-      border-radius: 20px;
-      padding: 18px 18px 14px;
-      box-shadow: 0 8px 22px rgba(30, 58, 138, 0.25);
-      margin-bottom: 12px;
+      border-radius: 16px;
+      padding: 12px 14px 10px;
+      box-shadow: 0 6px 16px rgba(30, 58, 138, 0.22);
+      margin-bottom: 10px;
     }
-    .summary-main { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
-    .summary-label { font-size: 0.86rem; color: #bfdbfe; font-weight: 600; }
-    .summary-value { font-size: 2.1rem; font-weight: 900; letter-spacing: -0.5px; line-height: 1.15; }
-    .summary-side { text-align: center; background: rgba(255, 255, 255, 0.1); border-radius: 14px; padding: 8px 14px; }
-    .summary-side-val { font-size: 1.5rem; font-weight: 900; line-height: 1.1; }
-    .summary-side-lbl { font-size: 0.74rem; color: #bfdbfe; }
-    .summary-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .summary-main { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .summary-label { font-size: 0.78rem; color: #bfdbfe; font-weight: 600; }
+    .summary-value { font-size: 1.6rem; font-weight: 900; letter-spacing: -0.4px; line-height: 1.15; }
+    .summary-side { text-align: center; background: rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 5px 10px; }
+    .summary-side-val { font-size: 1.15rem; font-weight: 900; line-height: 1.1; }
+    .summary-side-lbl { font-size: 0.68rem; color: #bfdbfe; }
+    .summary-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .summary-chips .chip { font-size: 0.74rem; padding: 2px 9px; }
     .summary-chips b { font-weight: 900; }
     .summary-foot {
       display: flex;
       flex-wrap: wrap;
-      gap: 4px 14px;
-      margin-top: 12px;
-      padding-top: 10px;
+      gap: 2px 12px;
+      margin-top: 8px;
+      padding-top: 7px;
       border-top: 1px solid rgba(255, 255, 255, 0.14);
-      font-size: 0.82rem;
+      font-size: 0.74rem;
       color: #cbd5e1;
     }
+
+    .hidden-toggle {
+      width: 100%;
+      background: transparent;
+      border: 1px dashed #cbd5e1;
+      color: var(--muted);
+      font-weight: 700;
+      font-size: 0.88rem;
+      padding: 12px;
+      border-radius: 12px;
+    }
+    .hidden-toggle:hover { background: #fff; color: var(--text); }
     .summary-foot b { color: #fff; }
 
     .search-wrap { margin-bottom: 10px; }
@@ -538,7 +552,13 @@
       .appbar { padding: 10px 24px; }
       .appbar-sub { max-width: none; }
       .container { padding: 20px 24px 32px; }
-      .summary-card { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 24px; padding: 20px 24px; }
+      .summary-card { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 24px; padding: 20px 24px; border-radius: 20px; }
+      .summary-value { font-size: 2.1rem; }
+      .summary-label { font-size: 0.86rem; }
+      .summary-side { padding: 8px 14px; }
+      .summary-side-val { font-size: 1.5rem; }
+      .summary-foot { font-size: 0.84rem; }
+      .summary-chips .chip { font-size: 0.8rem; padding: 3px 10px; }
       .summary-chips, .summary-foot { margin: 0; border: none; padding: 0; }
       .summary-foot { justify-content: flex-end; }
       #terminalsList { grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); }
@@ -698,9 +718,8 @@
         </div>
         <button id="saveAlertsBtn" type="button" class="btn-primary">שמור התראות</button>
         <span id="alertsSavedMsg" class="status-note"></span>
-        <div style="margin-top:10px;">
-          <label class="day-chip"><input id="showHiddenInput" type="checkbox" style="width:auto;" /> הצג מסופים מוסתרים</label>
-        </div>
+        <!-- מצב "הצג מוסתרים" - נשלט מהקישור שמתחת לרשימת המסופים -->
+        <input id="showHiddenInput" type="checkbox" class="hidden" />
       </section>
 
       <!-- סיכום -->
@@ -1140,7 +1159,12 @@
       if (e.target.closest("[data-close-sheet]") || e.target.id === "sheetBackdrop") { closeSheets(); return; }
       const proxy = e.target.closest("[data-proxy]");
       if (proxy) { document.getElementById(proxy.getAttribute("data-proxy"))?.click(); return; }
-      if (e.target.closest("[data-scroll-top]")) { closeSheets(); window.scrollTo({ top: 0, behavior: "smooth" }); }
+      if (e.target.closest("[data-scroll-top]")) { closeSheets(); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+      if (e.target.closest("[data-toggle-hidden]")) {
+        const cb = document.getElementById("showHiddenInput");
+        cb.checked = !cb.checked;
+        updateStatsAndList(currentTerminals);
+      }
     });
     document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSheets(); });
 
@@ -1281,6 +1305,15 @@
         listEl.innerHTML = `<div class="panel status-note">אין מסופים להצגה. לחץ על "כספונט" או "רענן" כדי לסנכרן מול כספונט.</div>`;
       } else {
         listEl.innerHTML = listed.map((t, idx) => renderTerminalCard(t, idx)).join("");
+      }
+      // קישור להצגת / הסתרת מסופים מוסתרים, מתחת לרשימה
+      const hiddenCount = allTerminals.length - terminals.length;
+      if (hiddenCount > 0 && userRole === "owner") {
+        listEl.insertAdjacentHTML("beforeend", `<button type="button" class="hidden-toggle" data-toggle-hidden>
+          ${showHidden
+            ? (hiddenCount === 1 ? "🙈 הסתר שוב את המסוף המוסתר" : `🙈 הסתר שוב את ${hiddenCount} המסופים המוסתרים`)
+            : `👁 ${hiddenCount === 1 ? "מסוף אחד מוסתר" : `${hiddenCount} מסופים מוסתרים`} · הצג`}
+        </button>`);
       }
 
       const totalBalance = filtered.reduce((acc, t) => acc + Number(t.balance ?? 0), 0);
