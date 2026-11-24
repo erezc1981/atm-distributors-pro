@@ -222,6 +222,31 @@
       border-radius: 12px;
     }
     .hidden-toggle:hover { background: #fff; color: var(--text); }
+
+    /* דוחות: מגמות ותחזית */
+    .report-section-title { font-weight: 800; font-size: 0.98rem; margin: 14px 0 8px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+    .trend-summary { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+    .trend-up-chip { background: #dcfce7; color: #15803d; }
+    .trend-down-chip { background: #fee2e2; color: #b91c1c; }
+    .trend-row {
+      border: 1px solid var(--border);
+      border-inline-start: 4px solid #cbd5e1;
+      border-radius: 12px;
+      padding: 9px 11px;
+      margin-bottom: 7px;
+      background: #fff;
+      color: var(--text);
+    }
+    .trend-row.trend-up { border-inline-start-color: #16a34a; }
+    .trend-row.trend-down { border-inline-start-color: #dc2626; }
+    .trend-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .trend-badge { font-weight: 800; font-size: 0.82rem; white-space: nowrap; }
+    .trend-up .trend-badge { color: #15803d; }
+    .trend-down .trend-badge { color: #b91c1c; }
+    .trend-flat .trend-badge { color: var(--muted); }
+    .trend-meta { font-size: 0.82rem; color: var(--muted); margin-top: 3px; }
+    .trend-rec { font-size: 0.84rem; margin-top: 4px; }
+    .trend-rec span { color: var(--muted); font-size: 0.78rem; }
     .summary-foot b { color: #fff; }
 
     .search-wrap { margin-bottom: 10px; }
@@ -707,7 +732,10 @@
 
       <!-- דוחות הטענה -->
       <section id="reportsPanel" class="panel sheet hidden">
-        <div class="sheet-head"><strong>📊 היסטוריית הטענות ודוחות</strong><button type="button" class="sheet-close" data-close-sheet aria-label="סגור">✕</button></div>
+        <div class="sheet-head"><strong>📊 דוחות</strong><button type="button" class="sheet-close" data-close-sheet aria-label="סגור">✕</button></div>
+        <div class="report-section-title">📈 מגמות ותחזית <span class="status-note">7 ימים אחרונים מול 7 שלפניהם</span></div>
+        <div id="trendsOutput" class="status-note">טוען...</div>
+        <div class="report-section-title">🧾 הטענות לפי חודש</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0;">
           <input id="reportMonthInput" type="month" style="width:auto;" />
           <button id="loadReportBtn" type="button" class="btn-primary">הצג</button>
@@ -1585,6 +1613,7 @@
       } else {
       userRef.collection("settings").doc("route").get().then((snap) => {
         const days = snap.exists && Array.isArray(snap.data().days) ? snap.data().days : [0, 2, 4];
+        routeDays = days.map(Number).filter((d) => d >= 0 && d <= 6);
         renderDaysSelector(days);
       });
 
@@ -2091,6 +2120,102 @@
 
     let lastReportRows = [];
 
+    // ---------- מגמות ותחזית (מההיסטוריה היומית שהמנוע אוסף) ----------
+    let routeDays = [0, 2, 4];
+
+    function localIsoDate(d) {
+      return d.toLocaleDateString("en-CA"); // YYYY-MM-DD לפי שעון המכשיר
+    }
+
+    // כמה ימים צריכה להספיק הטענה בביקור הבא (עד הביקור שאחריו), לפי ימי הקו
+    function coverDaysForNextVisit() {
+      const days = [...new Set(routeDays)].sort((a, b) => a - b);
+      if (!days.length) return 2;
+      const today = new Date().getDay();
+      const after = (from) => {
+        for (let i = 1; i <= 7; i++) if (days.includes((from + i) % 7)) return (from + i) % 7;
+        return from;
+      };
+      const next = after(today);
+      const following = after(next);
+      return ((following - next + 7) % 7) || 7;
+    }
+
+    function trendOf(cur, prev) {
+      if (!prev || prev <= 0) return { key: "new", label: "—", pct: null };
+      const pct = Math.round(((cur - prev) / prev) * 100);
+      if (pct >= 15) return { key: "up", label: `▲ +${pct}%`, pct };
+      if (pct <= -15) return { key: "down", label: `▼ ${pct}%`, pct };
+      return { key: "flat", label: `● ${pct > 0 ? "+" : ""}${pct}%`, pct };
+    }
+
+    let lastTrends = [];
+
+    async function loadTrends() {
+      const out = document.getElementById("trendsOutput");
+      if (!dataUid) return;
+      out.textContent = "טוען...";
+      const since = new Date();
+      since.setDate(since.getDate() - 28);
+      let days;
+      try {
+        const snap = await db.collection("distributors").doc(dataUid).collection("daily")
+          .where("date", ">=", localIsoDate(since)).orderBy("date").get();
+        days = snap.docs.map((d) => d.data());
+      } catch (err) {
+        out.textContent = errorHe(err, "טעינת המגמות נכשלה");
+        return;
+      }
+      const today = localIsoDate(new Date());
+      const full = days.filter((d) => d.date < today); // רק ימים שהסתיימו
+      if (full.length < 3) {
+        out.innerHTML = `⏳ נאספים נתונים (${full.length} ${full.length === 1 ? "יום" : "ימים"} שלמים עד עכשיו).
+          תחזית צריכה ויעד מומלץ יופיעו אחרי 3 ימים, והשוואת מגמה (עלייה/ירידה) אחרי שבועיים.`;
+        lastTrends = [];
+        return;
+      }
+      const last = full.slice(-7);
+      const prev = full.slice(-14, -7);
+      const avg = (arr, tid, field) => arr.length
+        ? arr.reduce((s, d) => s + Number(((d.terminals || {})[tid] || {})[field] || 0), 0) / arr.length
+        : 0;
+      const cover = coverDaysForNextVisit();
+      const visible = currentTerminals.filter((t) => !t.hidden);
+
+      lastTrends = visible.map((t) => {
+        const tid = String(t.id);
+        const curW = avg(last, tid, "withdrawn");
+        const prevW = avg(prev, tid, "withdrawn");
+        const curTx = avg(last, tid, "tx");
+        const prevTx = avg(prev, tid, "tx");
+        const trend = trendOf(curW, prev.length >= 3 ? prevW : 0);
+        const txTrend = trendOf(curTx, prev.length >= 3 ? prevTx : 0);
+        const balance = Number(t.balance || 0);
+        const daysLeft = curW > 0 ? balance / curW : null;
+        const recK = curW > 0 ? Math.max(5, Math.ceil((curW * cover * 1.15) / 5000) * 5) : null;
+        return { t, curW, curTx, trend, txTrend, daysLeft, recK };
+      }).sort((a, b) => (a.daysLeft ?? 999) - (b.daysLeft ?? 999));
+
+      const up = lastTrends.filter((x) => x.trend.key === "up").length;
+      const down = lastTrends.filter((x) => x.trend.key === "down").length;
+      const flat = lastTrends.filter((x) => x.trend.key === "flat").length;
+      const hasCompare = prev.length >= 3;
+      const rows = lastTrends.map((x) => {
+        const current = hasConfiguredTargetK(x.t) ? `${Number(x.t.baseTargetK)}K` : "לא הוגדר";
+        const left = x.daysLeft === null ? "אין משיכות" : x.daysLeft < 1 ? "⚠️ לא יספיק ליום שלם" : `יספיק לעוד ~${x.daysLeft.toFixed(1)} ימים`;
+        return `<div class="trend-row trend-${x.trend.key}">
+          <div class="trend-top"><b>${escapeHtml(x.t.name || x.t.id)}</b>${hasCompare ? `<span class="trend-badge">${x.trend.label}</span>` : ""}</div>
+          <div class="trend-meta">משיכות ₪${formatAmountILS(Math.round(x.curW))} ליום · ${Math.round(x.curTx)} עסקאות ליום${hasCompare && x.txTrend.pct !== null ? ` (${x.txTrend.label})` : ""} · ${left}</div>
+          ${x.recK ? `<div class="trend-rec">🎯 יעד מומלץ לביקור הבא: <b>${x.recK}K</b> <span>(מוגדר: ${current} · מכסה ${cover} ימים + 15% ביטחון)</span></div>` : ""}
+        </div>`;
+      }).join("");
+      out.innerHTML = `
+        <div class="trend-summary">${hasCompare
+          ? `<span class="chip trend-up-chip">▲ ${up} בעלייה</span><span class="chip trend-down-chip">▼ ${down} בירידה</span><span class="chip">● ${flat} יציבים</span>`
+          : `<span class="chip">השוואת מגמה תופיע אחרי שבועיים של נתונים (${full.length} ימים כרגע)</span>`}</div>
+        ${rows}`;
+    }
+
     function monthRange(value) {
       const [y, m] = String(value).split("-").map(Number);
       return { start: new Date(y, m - 1, 1).getTime(), end: new Date(y, m, 1).getTime() };
@@ -2148,7 +2273,10 @@
         const d = new Date();
         input.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
       }
-      if (!panel.classList.contains("hidden")) loadReport();
+      if (!panel.classList.contains("hidden")) {
+        loadReport();
+        loadTrends();
+      }
     });
 
     document.getElementById("exportReportBtn").addEventListener("click", () => {

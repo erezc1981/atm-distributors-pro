@@ -159,6 +159,12 @@ service cloud.firestore {
           || (isDriverOf(uid) && resource.data.byUid == request.auth.uid && resource.data.at > nowMs() - 12 * 3600000);
       }
 
+      // היסטוריה יומית (נכתבת ע"י מנוע הסנכרון): בסיס למגמות ותחזיות
+      match /daily/{day} {
+        allow read: if ownerOrDriver(uid);
+        allow write: if false;
+      }
+
       // התראות וואטסאפ: מספר טלפון + הפעלה/כיבוי
       match /settings/alerts {
         allow read: if isOwner(uid);
