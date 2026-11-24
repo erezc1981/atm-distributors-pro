@@ -662,6 +662,7 @@
 
   <!-- מסך ניהול ראשי -->
   <div id="appSection" class="hidden">
+    <div id="lockBanner" class="alert-banner hidden" style="background:#92400e;">🔒 תקופת הניסיון/המנוי הסתיימה — הנתונים מוצגים לקריאה בלבד. לחץ "שדרוג / תשלום" כדי להמשיך.</div>
     <div id="alertBanner" class="alert-banner hidden"></div>
 
     <header class="topbar">
@@ -844,6 +845,24 @@
     let unsubscribeCas = null;
     let unsubscribeProfile = null;
     let selectedPlan = { id: "monthly", label: "חודשי (₪99 / חודש)" };
+    let subscriptionValid = true;
+    const SAFE_TERMINAL_ID = /^[A-Za-z0-9_-]{1,40}$/;
+
+    // חוסם עריכה כשהמנוי/הניסיון הסתיים (האכיפה האמיתית נמצאת ב-firestore.rules)
+    function guardWrite() {
+      if (!currentUser) return false;
+      if (!subscriptionValid) {
+        document.getElementById("paymentFeedback").textContent = "תקופת הניסיון הסתיימה - יש לשדרג כדי להמשיך לערוך.";
+        document.getElementById("paymentModal").classList.remove("hidden");
+        return false;
+      }
+      return true;
+    }
+
+    function setLockedState(locked) {
+      subscriptionValid = !locked;
+      document.getElementById("lockBanner").classList.toggle("hidden", !locked);
+    }
 
     let activeRules = {
       refillDay: "midweek",
@@ -885,10 +904,19 @@
       const status = profile.subscriptionStatus || "trial";
       const now = Date.now();
 
-      if (status === "active" || profile.plan === "owner_free") {
+      const periodEnd = Number(profile.currentPeriodEnd) || 0;
+      if (profile.plan === "owner_free" || (status === "active" && (!periodEnd || now <= periodEnd))) {
         pill.className = "trial-pill active-plan";
         pill.textContent = "מנוי פעיל";
         summary.textContent = "המנוי שלך פעיל.";
+        setLockedState(false);
+        return;
+      }
+      if (status === "active") {
+        pill.className = "trial-pill expired";
+        pill.textContent = "המנוי פג";
+        summary.textContent = "תקופת המנוי הסתיימה. בחר מסלול כדי להמשיך.";
+        setLockedState(true);
         return;
       }
 
@@ -905,10 +933,12 @@
         pill.className = "trial-pill";
         pill.textContent = `ניסיון: ${daysLeft} ${daysLeft === 1 ? "יום נותר" : "ימים נותרו"}`;
         summary.textContent = `נותרו לך ${daysLeft} ימים לתקופת הניסיון. ניתן לשדרג למנוי מלא בכל עת.`;
+        setLockedState(false);
       } else {
         pill.className = "trial-pill expired";
         pill.textContent = "ניסיון: 0 ימים (הסתיים)";
         summary.textContent = "תקופת הניסיון הסתיימה. בחר מסלול כדי להמשיך להשתמש במערכת.";
+        setLockedState(true);
       }
     }
 
@@ -1160,7 +1190,7 @@
     }
 
     window.toggleTerminalSector = async function (terminalId) {
-      if (!currentUser) return;
+      if (!guardWrite()) return;
       const t = currentTerminals.find((x) => String(x.id) === String(terminalId));
       if (!t) return;
       const currentSector = getTerminalSector(t);
@@ -1178,7 +1208,7 @@
     };
 
     window.togglePaperRoll = async function (terminalId) {
-      if (!currentUser) return;
+      if (!guardWrite()) return;
       const t = currentTerminals.find((x) => String(x.id) === String(terminalId));
       if (!t) return;
       const nextState = !Boolean(t.paperRollNeeded);
@@ -1191,7 +1221,7 @@
     };
 
     window.editTerminalThreshold = async function (terminalId) {
-      if (!currentUser) return;
+      if (!guardWrite()) return;
       const t = currentTerminals.find((x) => String(x.id) === String(terminalId));
       const currentThresh = getTerminalThreshold(t || {});
       const input = prompt(`הזן סף התראה בשקלים (₪) למסוף ${t?.name || terminalId} (${terminalId}):`, String(currentThresh));
@@ -1211,7 +1241,7 @@
     };
 
     window.editTerminalNote = async function (terminalId) {
-      if (!currentUser) return;
+      if (!guardWrite()) return;
       const t = currentTerminals.find((x) => String(x.id) === String(terminalId));
       const initialNote = String(t?.notes ?? "");
       const input = prompt(`הערות למסוף ${t?.name || terminalId} (${terminalId}):`, initialNote);
@@ -1225,7 +1255,7 @@
     };
 
     window.openEditTargetModal = async function (terminalId) {
-      if (!currentUser) return;
+      if (!guardWrite()) return;
       const t = currentTerminals.find((x) => String(x.id) === String(terminalId));
       const initialVal = hasConfiguredTargetK(t) ? String(Number(t.baseTargetK)) : "";
       const input = prompt(`הזן יעד מילוי באלפים (k) למסוף ${terminalId}:`, initialVal);
@@ -1254,7 +1284,7 @@
     };
 
     window.toggleCompleted = async function (terminalId) {
-      if (!currentUser) return;
+      if (!guardWrite()) return;
       const t = currentTerminals.find((x) => String(x.id) === String(terminalId));
       if (!t) return;
 
@@ -1291,7 +1321,7 @@
     });
 
     async function triggerCasSync(uid) {
-      if (!uid) return;
+      if (!uid || !subscriptionValid) return;
       const casDocRef = db.collection("distributors").doc(uid).collection("settings").doc("cas_sync");
       const snap = await casDocRef.get();
       const statusEl = document.getElementById("casSyncStatus");
@@ -1354,7 +1384,8 @@
 
       unsubscribeTerminals = userRef.collection("terminals").onSnapshot((snap) => {
         currentTerminals = snap.docs
-          .map((d) => ({ id: d.id, ...d.data() }))
+          .filter((d) => SAFE_TERMINAL_ID.test(d.id))
+          .map((d) => ({ ...d.data(), id: d.id }))
           .sort((a, b) => Number(a.order ?? 9999) - Number(b.order ?? 9999));
         updateStatsAndList(currentTerminals);
       });
@@ -1461,7 +1492,7 @@
     });
 
     document.getElementById("saveRouteBtn").addEventListener("click", async () => {
-      if (!currentUser) return;
+      if (!guardWrite()) return;
       const days = [...document.querySelectorAll("#daysContainer input:checked")].map((el) => Number(el.value));
       await db.collection("distributors").doc(currentUser.uid).collection("settings").doc("route").set({
         days,
@@ -1472,7 +1503,7 @@
     });
 
     document.getElementById("saveAndSyncCasBtn").addEventListener("click", async () => {
-      if (!currentUser) return;
+      if (!guardWrite()) return;
       const username = document.getElementById("casUserInput").value.trim();
       if (!username) {
         alert("יש להזין שם משתמש של כספונט");
