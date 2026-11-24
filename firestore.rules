@@ -36,6 +36,11 @@ service cloud.firestore {
             && nowMs() <= p.get('trialEndsAt', 0));
     }
 
+    // RSA-3072 מוצפן ב-Base64 הוא בדיוק 512 תווים
+    function validPasswordEnc(v) {
+      return v is string && v.size() == 512 && v.matches('^[A-Za-z0-9+/=]+$');
+    }
+
     function changedKeys() {
       return request.resource.data.diff(resource.data).affectedKeys();
     }
@@ -88,16 +93,19 @@ service cloud.firestore {
       match /settings/cas_sync {
         allow read: if isOwner(uid);
         // אין כתיבת סיסמה מהדפדפן; סטטוסי סנכרון נכתבים ע"י השרת
+        // passwordEnc = סיסמה מוצפנת בדפדפן (RSA-OAEP, Base64); אין שדה סיסמה גלויה
         allow create: if isOwner(uid)
           && hasValidSub(uid)
           && request.resource.data.keys()
-               .hasOnly(['username', 'syncRequested', 'syncRequestedAt', 'updatedAt', 'lastSyncError'])
-          && (!('lastSyncError' in request.resource.data) || request.resource.data.lastSyncError == '');
+               .hasOnly(['username', 'passwordEnc', 'syncRequested', 'syncRequestedAt', 'updatedAt', 'lastSyncError'])
+          && (!('lastSyncError' in request.resource.data) || request.resource.data.lastSyncError == '')
+          && (!('passwordEnc' in request.resource.data) || validPasswordEnc(request.resource.data.passwordEnc));
         allow update: if isOwner(uid)
           && hasValidSub(uid)
           && changedKeys()
-               .hasOnly(['username', 'syncRequested', 'syncRequestedAt', 'updatedAt', 'lastSyncError'])
-          && (!('lastSyncError' in changedKeys()) || request.resource.data.lastSyncError == '');
+               .hasOnly(['username', 'passwordEnc', 'syncRequested', 'syncRequestedAt', 'updatedAt', 'lastSyncError'])
+          && (!('lastSyncError' in changedKeys()) || request.resource.data.lastSyncError == '')
+          && (!('passwordEnc' in changedKeys()) || validPasswordEnc(request.resource.data.passwordEnc));
         allow delete: if false;
       }
 
