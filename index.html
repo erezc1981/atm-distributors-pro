@@ -1880,7 +1880,7 @@
 
     // ---------- סנכרון מול כספונט: בכל כניסה לאתר/לאפליקציה ובלחיצה על "רענן" ----------
     // הבקשה נשלחת לשרת ממסר קטן (Cloudflare Worker) שמאמת את המשתמש ומפעיל את ריצת הסנכרון.
-    const SYNC_RELAY_URL = ""; // יוגדר אחרי הקמת השרת הממסר
+    const SYNC_RELAY_URL = "https://atm-sync.erezc1981.workers.dev";
     const AUTO_SYNC_MIN_GAP_MS = 5 * 60 * 1000; // בכניסה: לא מסנכרנים שוב אם עודכן ב-5 הדקות האחרונות
     let lastSyncRequestMs = 0;
 
