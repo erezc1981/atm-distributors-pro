@@ -656,7 +656,7 @@
       <span class="atm-tag">ATM</span>
       <span>ניהול קו כספומטים</span>
     </div>
-    <p class="status-note" style="margin:0">התחבר לחשבון המפיץ או הירשם לחודש ניסיון חינם. נהג שהוזמן - הירשם עם האימייל שאליו נשלחה ההזמנה.</p>
+    <p class="status-note" style="margin:0">התחבר לחשבון המפיץ או הירשם לחודש ניסיון חינם. עובד שהוזמן - הירשם עם האימייל שאליו נשלחה ההזמנה.</p>
     <input id="emailInput" type="email" placeholder="אימייל" autocomplete="email" />
     <input id="passwordInput" type="password" placeholder="סיסמה (לפחות 6 תווים)" autocomplete="current-password" />
     <button id="loginBtn" type="button" class="btn-primary">התחברות</button>
@@ -676,7 +676,7 @@
     <div id="alertBanner" class="alert-banner hidden"></div>
     <div id="offlineBanner" class="alert-banner hidden" style="background:#475569;">📴 אין חיבור לאינטרנט — אפשר להמשיך לעבוד, השינויים יישמרו כשהחיבור יחזור.</div>
     <div id="verifyBanner" class="alert-banner hidden" style="background:#1d4ed8;">
-      ✉️ יש לאמת את כתובת האימייל (נשלח אליך קישור). בלי אימות לא ניתן לחבר כספונט או להזמין נהגים.
+      ✉️ יש לאמת את כתובת האימייל (נשלח אליך קישור). בלי אימות לא ניתן לחבר כספונט או להזמין עובדים.
       <button id="resendVerifyBtn" type="button" style="margin-inline-start:8px;padding:3px 10px;">שלח שוב</button>
       <button id="checkVerifyBtn" type="button" style="padding:3px 10px;">כבר אימתתי</button>
     </div>
@@ -700,7 +700,7 @@
         <button id="toggleRouteBtn" type="button" class="owner-only">📅 ימי קו</button>
         <button id="toggleCasBtn" type="button" class="owner-only">🏦 כספונט</button>
         <button id="toggleAlertsBtn" type="button" class="owner-only">🔔 התראות</button>
-        <button id="toggleDriversBtn" type="button" class="owner-only">👥 נהגים</button>
+        <button id="toggleDriversBtn" type="button" class="owner-only">👥 עובדים</button>
         <button id="toggleReportsBtn" type="button">📊 דוחות</button>
         <button id="openPayModalBtn" type="button" class="btn-pay owner-only">💳 שדרוג / תשלום</button>
         <button id="whatsappBtn" type="button" class="btn-whatsapp">💬 שלח לוואטסאפ</button>
@@ -734,15 +734,16 @@
         <div id="casSyncStatus" class="status-note" style="margin-top:8px;"></div>
       </section>
 
-      <!-- נהגים -->
+      <!-- עובדים -->
       <section id="driversPanel" class="panel hidden">
-        <strong>👥 נהגים</strong>
+        <strong>👥 עובדים</strong>
         <p class="status-note" style="margin:8px 0;">
-          נהג יכול לראות את המסופים, לסמן הטענות (עם סכום), נייר והערות - בלי גישה להגדרות, למנוי או לכספונט.
-          הזמן לפי אימייל; הנהג נרשם עם אותו אימייל, מאמת אותו, ומצטרף אוטומטית.
+          עובד יכול לראות את המסופים, לסמן הטענות (עם סכום), נייר והערות - בלי גישה להגדרות, למנוי או לכספונט.
+          הזמן לפי אימייל; העובד נרשם עם אותו אימייל, מאמת אותו, ומצטרף אוטומטית.
         </p>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
-          <input id="driverEmailInput" type="email" placeholder="אימייל של הנהג" style="flex:1 1 220px;" />
+          <input id="driverNameInput" type="text" placeholder="שם העובד" maxlength="60" style="flex:1 1 160px;" />
+          <input id="driverEmailInput" type="email" placeholder="אימייל של העובד" style="flex:1 1 220px;" />
           <button id="inviteDriverBtn" type="button" class="btn-primary">שלח הזמנה</button>
         </div>
         <div id="driversList" class="status-note"></div>
@@ -902,8 +903,9 @@
 
     const ADMIN_UID = "TblW8UHDSBTh91BCJcqo3YKEqQJ3";
     const TERMS_VERSION = "2026-11-24";
-    let dataUid = null;      // של מי הנתונים שמוצגים: המפיץ עצמו, או המפיץ שהזמין את הנהג
-    let userRole = "owner";  // "owner" (מפיץ) או "driver" (נהג)
+    let dataUid = null;      // של מי הנתונים שמוצגים: המפיץ עצמו, או המפיץ שהזמין את העובד
+    let userRole = "owner";  // "owner" (מפיץ) או "driver" (עובד)
+    let workerName = "";     // שם העובד המחובר (נרשם בכל הטענה); למפיץ - "המפיץ"
 
     const AUTH_ERRORS_HE = {
       "auth/invalid-email": "כתובת האימייל לא תקינה.",
@@ -960,7 +962,7 @@
     const SAFE_TERMINAL_ID = /^[A-Za-z0-9_-]{1,40}$/;
 
     // חוסם עריכה כשהמנוי/הניסיון הסתיים (האכיפה האמיתית נמצאת ב-firestore.rules)
-    // פעולות ניהול (סף, יעד, מגזר, סדר, הסתרה) - למפיץ בלבד, לא לנהג
+    // פעולות ניהול (סף, יעד, מגזר, סדר, הסתרה) - למפיץ בלבד, לא לעובד
     function guardManage() {
       if (userRole === "driver") {
         alert("פעולה זו זמינה רק למפיץ.");
@@ -1489,7 +1491,8 @@
           balanceBefore: Math.round(Number(t.balance) || 0),
           at: now,
           byUid: currentUser.uid,
-          byEmail: currentUser.email || ""
+          byEmail: currentUser.email || "",
+          byName: String(workerName || "").slice(0, 60)
         });
         batch.set(termRef, { refilled: true, lastRefilledAt: now, lastRefillId: refillRef.id }, { merge: true });
       } else {
@@ -1548,7 +1551,7 @@
 
       const isDriver = userRole === "driver";
       if (isDriver) {
-        document.getElementById("lastSyncPill").textContent = "נהג";
+        document.getElementById("lastSyncPill").textContent = "עובד";
       } else {
       userRef.collection("settings").doc("route").get().then((snap) => {
         const days = snap.exists && Array.isArray(snap.data().days) ? snap.data().days : [0, 2, 4];
@@ -1700,7 +1703,7 @@
       try {
         const cred = await auth.createUserWithEmailAndPassword(email, pass);
         cred.user.sendEmailVerification().catch(() => {});
-        // נהג שהוזמן לא מקבל חשבון מפיץ - הוא יצורף למפיץ אחרי אימות האימייל
+        // עובד שהוזמן לא מקבל חשבון מפיץ - הוא יצורף למפיץ אחרי אימות האימייל
         const invite = await findInviteFor(cred.user);
         if (invite) return;
         const now = Date.now();
@@ -1842,7 +1845,7 @@
     renderDaysSelector([0, 2, 4]);
     syncRuleChipButtons();
 
-    // ---------- תפקיד המשתמש: מפיץ / נהג ----------
+    // ---------- תפקיד המשתמש: מפיץ / עובד ----------
 
     function escapeAttr(v) { return escapeHtml(v); }
 
@@ -1863,7 +1866,7 @@
         const mem = await db.collection("memberships").doc(user.uid).get();
         if (mem.exists) {
           const m = mem.data() || {};
-          const r = { role: "driver", dataUid: m.distributorUid, distributorEmail: m.distributorEmail || "" };
+          const r = { role: "driver", dataUid: m.distributorUid, distributorEmail: m.distributorEmail || "", name: m.name || "" };
           localStorage.setItem(cacheKey, JSON.stringify(r));
           return r;
         }
@@ -1876,18 +1879,19 @@
         const invite = await findInviteFor(user);
         if (invite) {
           if (!user.emailVerified) return { role: "pending-driver", invite };
-          // הצטרפות: יצירת שיוך לנהג ומחיקת ההזמנה
+          // הצטרפות: יצירת שיוך לעובד ומחיקת ההזמנה
           const batch = db.batch();
           batch.set(db.collection("memberships").doc(user.uid), {
             distributorUid: invite.distributorUid,
             distributorEmail: invite.distributorEmail || "",
             email: user.email,
+            name: String(invite.name || "").slice(0, 60),
             role: "driver",
             joinedAt: Date.now()
           });
           batch.delete(db.collection("invites").doc(invite.id));
           await batch.commit();
-          const r = { role: "driver", dataUid: invite.distributorUid, distributorEmail: invite.distributorEmail || "" };
+          const r = { role: "driver", dataUid: invite.distributorUid, distributorEmail: invite.distributorEmail || "", name: invite.name || "" };
           localStorage.setItem(cacheKey, JSON.stringify(r));
           return r;
         }
@@ -1916,7 +1920,7 @@
         userRole = "driver";
         dataUid = null;
         document.body.classList.add("role-driver");
-        driverBanner.textContent = `הוזמנת כנהג ע"י ${r.invite.distributorEmail || "מפיץ"}. אמת את האימייל (נשלח אליך קישור) ולחץ "כבר אימתתי" כדי להצטרף.`;
+        driverBanner.textContent = `הוזמנת כעובד ע"י ${r.invite.distributorEmail || "מפיץ"}. אמת את האימייל (נשלח אליך קישור) ולחץ "כבר אימתתי" כדי להצטרף.`;
         driverBanner.classList.remove("hidden");
         document.getElementById("verifyBanner").classList.remove("hidden");
         document.getElementById("terminalsList").innerHTML = "";
@@ -1925,9 +1929,10 @@
 
       userRole = r.role;
       dataUid = r.dataUid;
+      workerName = userRole === "driver" ? (r.name || user.email || "") : "המפיץ";
       document.body.classList.toggle("role-driver", userRole === "driver");
       if (userRole === "driver") {
-        driverBanner.textContent = `🚚 מחובר כנהג של ${r.distributorEmail || "המפיץ"} - אפשר לסמן הטענות, נייר והערות.`;
+        driverBanner.textContent = `👷 ${r.name ? r.name + " - " : ""}מחובר כעובד של ${r.distributorEmail || "המפיץ"}. אפשר לסמן הטענות, נייר והערות.`;
         driverBanner.classList.remove("hidden");
       } else {
         driverBanner.classList.add("hidden");
@@ -1959,7 +1964,7 @@
       await startSession(auth.currentUser);
     });
 
-    // ---------- נהגים ----------
+    // ---------- עובדים ----------
 
     async function loadDrivers() {
       const el = document.getElementById("driversList");
@@ -1969,18 +1974,32 @@
         db.collection("invites").where("distributorUid", "==", dataUid).get()
       ]);
       const items = [];
-      mems.forEach((d) => items.push(`<div style="display:flex;gap:8px;align-items:center;margin:4px 0;">🚚 <b>${escapeHtml(d.data().email || "")}</b> <span>נהג פעיל</span>
-        <button type="button" data-remove-member="${escapeAttr(d.id)}">הסר</button></div>`));
-      invs.forEach((d) => items.push(`<div style="display:flex;gap:8px;align-items:center;margin:4px 0;">✉️ ${escapeHtml(d.id)} <span>ממתין להרשמה</span>
-        <button type="button" data-cancel-invite="${escapeAttr(d.id)}">בטל הזמנה</button></div>`));
-      el.innerHTML = items.length ? items.join("") : "אין נהגים עדיין.";
+      mems.forEach((d) => {
+        const m = d.data() || {};
+        items.push(`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0;">👷 <b>${escapeHtml(m.name || "ללא שם")}</b> <span>${escapeHtml(m.email || "")}</span> <span>· עובד פעיל</span>
+          <button type="button" data-rename-member="${escapeAttr(d.id)}" data-current-name="${escapeAttr(m.name || "")}">✏️ שנה שם</button>
+          <button type="button" data-remove-member="${escapeAttr(d.id)}">הסר</button></div>`);
+      });
+      invs.forEach((d) => {
+        const inv = d.data() || {};
+        items.push(`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0;">✉️ <b>${escapeHtml(inv.name || "")}</b> ${escapeHtml(d.id)} <span>· ממתין להרשמה</span>
+          <button type="button" data-cancel-invite="${escapeAttr(d.id)}">בטל הזמנה</button></div>`);
+      });
+      el.innerHTML = items.length ? items.join("") : "אין עובדים עדיין.";
     }
 
     document.getElementById("driversList").addEventListener("click", async (e) => {
       const rm = e.target.closest("[data-remove-member]");
       const ci = e.target.closest("[data-cancel-invite]");
+      const rn = e.target.closest("[data-rename-member]");
       try {
-        if (rm && confirm("להסיר את הנהג? הוא יאבד גישה מיד.")) {
+        if (rn) {
+          const input = prompt("שם העובד:", rn.getAttribute("data-current-name") || "");
+          if (input === null) return;
+          const name = input.trim().slice(0, 60);
+          if (!name) { alert("יש להזין שם"); return; }
+          await db.collection("memberships").doc(rn.getAttribute("data-rename-member")).update({ name });
+        } else if (rm && confirm("להסיר את העובד? הוא יאבד גישה מיד.")) {
           await db.collection("memberships").doc(rm.getAttribute("data-remove-member")).delete();
         } else if (ci) {
           await db.collection("invites").doc(ci.getAttribute("data-cancel-invite")).delete();
@@ -1999,6 +2018,11 @@
         alert("יש לאמת קודם את האימייל שלך (ראה ההודעה בראש המסך).");
         return;
       }
+      const name = document.getElementById("driverNameInput").value.trim().slice(0, 60);
+      if (!name) {
+        alert("יש להזין את שם העובד");
+        return;
+      }
       const email = document.getElementById("driverEmailInput").value.trim().toLowerCase();
       if (!/^[^\s@/]+@[^\s@/]+\.[^\s@/]+$/.test(email) || email.length > 120) {
         alert("כתובת אימייל לא תקינה");
@@ -2012,13 +2036,15 @@
         await db.collection("invites").doc(email).set({
           distributorUid: dataUid,
           distributorEmail: currentUser.email || "",
+          name,
           createdAt: Date.now()
         });
         document.getElementById("driverEmailInput").value = "";
+        document.getElementById("driverNameInput").value = "";
         await loadDrivers();
         const appUrl = location.origin + location.pathname;
-        const text = `הוזמנת להצטרף כנהג לאפליקציית ניהול הכספומטים. הירשם עם האימייל ${email} כאן: ${appUrl}`;
-        if (confirm("ההזמנה נשמרה. לשלוח לנהג את הקישור בוואטסאפ?")) {
+        const text = `היי ${name}, הוזמנת להצטרף כעובד לאפליקציית ניהול הכספומטים. הירשם עם האימייל ${email} כאן: ${appUrl}`;
+        if (confirm("ההזמנה נשמרה. לשלוח לעובד את הקישור בוואטסאפ?")) {
           window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
         }
       } catch (err) {
@@ -2069,7 +2095,7 @@
         byTerm[k].sum += Number(r.amount || 0);
         const day = new Date(r.at).toLocaleDateString("he-IL");
         byDay[day] = (byDay[day] || 0) + Number(r.amount || 0);
-        const who = r.byEmail || "—";
+        const who = r.byName || r.byEmail || "—";
         byDriver[who] = (byDriver[who] || 0) + Number(r.amount || 0);
       });
       const termRows = Object.entries(byTerm).sort((a, b) => b[1].sum - a[1].sum)
@@ -2080,7 +2106,7 @@
         <div style="color:#111827;font-weight:800;margin:6px 0;">סה"כ הוטען: ₪${formatAmountILS(total)} · ${lastReportRows.length} הטענות · ${calcExactPacks5k(total)} חבילות 5K</div>
         <table class="report-table"><tr><th>מסוף</th><th>מזהה</th><th>הטענות</th><th>סה"כ</th><th>ממוצע להטענה</th></tr>${termRows}</table>
         <table class="report-table"><tr><th>יום</th><th>סה"כ</th><th>חבילות 5K</th></tr>${dayRows}</table>
-        <table class="report-table"><tr><th>מי הטעין</th><th>סה"כ</th></tr>${driverRows}</table>`;
+        <table class="report-table"><tr><th>עובד</th><th>סה"כ</th></tr>${driverRows}</table>`;
     }
 
     document.getElementById("loadReportBtn").addEventListener("click", loadReport);
@@ -2102,11 +2128,11 @@
         if (/^[=+\-@]/.test(s)) s = "'" + s; // מניעת הזרקת נוסחאות באקסל
         return `"${s.replace(/"/g, '""')}"`;
       };
-      const lines = [["תאריך", "שעה", "מסוף", "מזהה", "סכום", "יתרה לפני", "מי הטעין"].map(csvCell).join(",")];
+      const lines = [["תאריך", "שעה", "מסוף", "מזהה", "סכום", "יתרה לפני", "עובד", "אימייל"].map(csvCell).join(",")];
       lastReportRows.forEach((r) => {
         const d = new Date(r.at);
         lines.push([d.toLocaleDateString("he-IL"), d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" }),
-          r.terminalName, r.terminalId, r.amount, r.balanceBefore ?? "", r.byEmail || ""].map(csvCell).join(","));
+          r.terminalName, r.terminalId, r.amount, r.balanceBefore ?? "", r.byName || "", r.byEmail || ""].map(csvCell).join(","));
       });
       const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
       const a = document.createElement("a");

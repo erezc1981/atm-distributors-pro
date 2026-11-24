@@ -32,7 +32,7 @@ service cloud.firestore {
       return request.auth.token.get('email', '').lower();
     }
 
-    // נהג ששויך למפיץ uid
+    // עובד ששויך למפיץ uid
     function isDriverOf(uid) {
       return signedIn()
         && exists(/databases/$(database)/documents/memberships/$(request.auth.uid))
@@ -71,7 +71,7 @@ service cloud.firestore {
     }
 
     match /distributors/{uid} {
-      // נהג קורא את הפרופיל כדי לדעת אם המנוי של המפיץ בתוקף
+      // עובד קורא את הפרופיל כדי לדעת אם המנוי של המפיץ בתוקף
       allow read: if ownerOrDriver(uid) || isAdmin();
 
       // הרשמה: רק פרופיל ניסיון של עד 30 יום, עם זמן יצירה אמיתי ואישור תנאי שימוש
@@ -85,7 +85,7 @@ service cloud.firestore {
         && request.resource.data.trialEndsAt <= request.resource.data.createdAt + 30 * 86400000
         && (!('termsVersion' in request.resource.data) || (request.resource.data.termsVersion is string && request.resource.data.termsVersion.size() <= 20))
         && (!('termsAcceptedAt' in request.resource.data) || request.resource.data.termsAcceptedAt is int)
-        // נהג שכבר שויך למפיץ לא פותח חשבון מפיץ
+        // עובד שכבר שויך למפיץ לא פותח חשבון מפיץ
         && !exists(/databases/$(database)/documents/memberships/$(request.auth.uid));
 
       // המשתמש לא יכול לשנות לעצמו מנוי/ניסיון/תוכנית - רק בקשת שדרוג
@@ -117,7 +117,7 @@ service cloud.firestore {
         allow read: if ownerOrDriver(uid);
         // מסופים נוצרים ע"י הסנכרון בלבד
         allow create, delete: if false;
-        // מפיץ: כל שדות הניהול. נהג: רק הטענה, נייר והערות.
+        // מפיץ: כל שדות הניהול. עובד: רק הטענה, נייר והערות.
         allow update: if hasValidSub(uid) && (
           (isOwner(uid)
             && changedKeys().hasOnly([
@@ -137,12 +137,12 @@ service cloud.firestore {
         );
       }
 
-      // היסטוריית הטענות: נרשמת ע"י המפיץ או הנהג, לא ניתנת לעריכה
+      // היסטוריית הטענות: נרשמת ע"י המפיץ או העובד, לא ניתנת לעריכה
       match /refills/{rid} {
         allow read: if ownerOrDriver(uid);
         allow create: if ownerOrDriver(uid)
           && hasValidSub(uid)
-          && request.resource.data.keys().hasOnly(['terminalId', 'terminalName', 'amount', 'balanceBefore', 'at', 'byUid', 'byEmail'])
+          && request.resource.data.keys().hasOnly(['terminalId', 'terminalName', 'amount', 'balanceBefore', 'at', 'byUid', 'byEmail', 'byName'])
           && request.resource.data.byUid == request.auth.uid
           && request.resource.data.terminalId is string && request.resource.data.terminalId.size() <= 40
           && request.resource.data.terminalName is string && request.resource.data.terminalName.size() <= 80
@@ -151,9 +151,10 @@ service cloud.firestore {
           // הטענה שנרשמה בלי קליטה נשלחת מאוחר יותר - עד 7 ימים אחורה
           && request.resource.data.at > nowMs() - 7 * 86400000
           && request.resource.data.at < nowMs() + 600000
-          && request.resource.data.byEmail is string && request.resource.data.byEmail.size() <= 120;
+          && request.resource.data.byEmail is string && request.resource.data.byEmail.size() <= 120
+          && (!('byName' in request.resource.data) || (request.resource.data.byName is string && request.resource.data.byName.size() <= 60));
         allow update: if false;
-        // ביטול רישום: המפיץ תמיד, הנהג רק את שלו ותוך 12 שעות
+        // ביטול רישום: המפיץ תמיד, העובד רק את שלו ותוך 12 שעות
         allow delete: if isOwner(uid)
           || (isDriverOf(uid) && resource.data.byUid == request.auth.uid && resource.data.at > nowMs() - 12 * 3600000);
       }
@@ -207,11 +208,11 @@ service cloud.firestore {
       }
     }
 
-    // הזמנת נהג: מזהה המסמך = אימייל הנהג באותיות קטנות
+    // הזמנת עובד: מזהה המסמך = אימייל העובד באותיות קטנות
     match /invites/{email} {
       allow read: if signedIn() && (resource.data.distributorUid == request.auth.uid || myEmail() == email);
       allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['distributorUid', 'distributorEmail', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['distributorUid', 'distributorEmail', 'name', 'createdAt'])
         && request.resource.data.distributorUid == request.auth.uid
         && exists(/databases/$(database)/documents/distributors/$(request.auth.uid))
         && hasValidSub(request.auth.uid)
@@ -219,26 +220,33 @@ service cloud.firestore {
         && email != myEmail()
         && email.size() <= 120
         && request.resource.data.distributorEmail is string && request.resource.data.distributorEmail.size() <= 120
-        && request.resource.data.createdAt is int;
+        && request.resource.data.createdAt is int
+        && (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 60));
       // הזמנה קיימת של מפיץ אחר לא נדרסת
       allow update: if false;
       allow delete: if signedIn() && (resource.data.distributorUid == request.auth.uid || myEmail() == email);
     }
 
-    // שיוך נהג למפיץ: נוצר ע"י הנהג עצמו, רק עם אימייל מאומת והזמנה תואמת
+    // שיוך עובד למפיץ: נוצר ע"י העובד עצמו, רק עם אימייל מאומת והזמנה תואמת
     match /memberships/{driverUid} {
       allow read: if signedIn() && (request.auth.uid == driverUid || resource.data.distributorUid == request.auth.uid || isAdmin());
       allow create: if request.auth.uid == driverUid
         && emailVerified()
-        && request.resource.data.keys().hasOnly(['distributorUid', 'distributorEmail', 'email', 'role', 'joinedAt'])
+        && request.resource.data.keys().hasOnly(['distributorUid', 'distributorEmail', 'email', 'name', 'role', 'joinedAt'])
         && request.resource.data.role == 'driver'
         && request.resource.data.email.lower() == myEmail()
         && request.resource.data.joinedAt is int
         && exists(/databases/$(database)/documents/invites/$(myEmail()))
         && get(/databases/$(database)/documents/invites/$(myEmail())).data.distributorUid == request.resource.data.distributorUid
-        // מפיץ עם חשבון משלו לא הופך לנהג
+        // השם נלקח מההזמנה של המפיץ (העובד לא בוחר לעצמו שם אחר)
+        && request.resource.data.get('name', '') == get(/databases/$(database)/documents/invites/$(myEmail())).data.get('name', '')
+        // מפיץ עם חשבון משלו לא הופך לעובד
         && !exists(/databases/$(database)/documents/distributors/$(request.auth.uid));
-      allow update: if false;
+      // המפיץ יכול לשנות רק את שם העובד
+      allow update: if signedIn() && resource.data.distributorUid == request.auth.uid
+        && changedKeys().hasOnly(['name'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 1 && request.resource.data.name.size() <= 60;
       allow delete: if signedIn() && (request.auth.uid == driverUid || resource.data.distributorUid == request.auth.uid);
     }
 
