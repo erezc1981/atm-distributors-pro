@@ -524,6 +524,11 @@ function renderTerminalCard(t, index) {
       : "sector-none";
 
   const paperNeeded = Boolean(t.paperRollNeeded);
+  // תקינות מסוף: תקשורת אחרונה מעל 5 שעות, אין עסקאות עד 12:00 (כמו בהתראות הוואטסאפ)
+  const lastComm = Number(t.lastCommAt) || 0;
+  const noComm = lastComm > 0 && Date.now() - lastComm > 5 * 3600 * 1000;
+  const noActivity = new Date().getHours() >= 12 && txMidnight === 0;
+  const hhmm = (ms) => new Date(ms).toLocaleString("he-IL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
   const noteText = String(t.notes ?? "").trim();
   const safeNoteText = escapeHtml(noteText);
   const targetDisplayText = hasTarget ? `${targetK}K` : "—";
@@ -566,6 +571,8 @@ function renderTerminalCard(t, index) {
         <button type="button" class="chip sector-badge ${sectorClass}" title="החלפת מגזר" data-act="toggleTerminalSector" data-id="${safeIdAttr}">${sectorLabel}</button>
         ${paperNeeded ? `<button type="button" class="chip chip-warn" title="לחץ לביטול" data-act="togglePaperRoll" data-id="${safeIdAttr}">🧻 נייר להחלפה</button>` : ""}
         ${isHidden ? `<span class="chip chip-muted">מוסתר</span>` : ""}
+        ${noComm && !isHidden ? `<span class="chip chip-offline" title="תקשורת אחרונה: ${hhmm(lastComm)}">📡 אין תקשורת מ-${hhmm(lastComm)}</span>` : ""}
+        ${noActivity && !isHidden ? `<span class="chip chip-warn">💤 אין פעילות היום</span>` : ""}
         <span class="chip chip-muted">${formatAmountILS(txMidnight)} עסקאות מחצות</span>
       </div>
       ${noteText ? `<button type="button" class="tc-note" title="ערוך הערה" data-act="editTerminalNote" data-id="${safeIdAttr}">📝 ${safeNoteText}</button>` : ""}
