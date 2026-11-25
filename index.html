@@ -1121,12 +1121,11 @@
       return roundedTo5k > 0 ? roundedTo5k : 5000;
     }
 
-    function calcExactPacks5k(loadAmountILS) {
-      const amount = Math.max(0, Number(loadAmountILS ?? 0));
-      if (amount === 0) return 0;
-      const packs = amount / 5000;
-      return Number.isInteger(packs) ? packs : Number(packs.toFixed(1));
+    // חבילת 5K מהבנק נדרשת רק להטענה שמסתיימת ב-5 אלף (5K, 15K, 25K...) - את השאר משלימים בחבילות של 10K
+    function countPacks5k(amounts) {
+      return amounts.filter((v) => Math.round(Number(v || 0) / 5000) % 2 === 1).length;
     }
+
 
     function renderDaysSelector(selectedDays = []) {
       const wrap = document.getElementById("daysContainer");
@@ -1518,7 +1517,7 @@
       const loads = filtered.map((t) => (t.refilled ? 0 : calcLoadAmountILS(t.balance, getEffectiveTargetK(t))));
       const totalToLoad = loads.reduce((acc, v) => acc + v, 0);
       const stationsToFill = loads.filter((v) => v > 0).length;
-      const totalPacks5k = calcExactPacks5k(totalToLoad);
+      const totalPacks5k = countPacks5k(loads);
       const alertTerminals = filtered.filter((t) => Number(t.balance ?? 0) <= getTerminalThreshold(t));
 
       const bannerEl = document.getElementById("alertBanner");
@@ -2100,7 +2099,7 @@
         (acc, t) => acc + getTerminalTxMidnight(t),
         0
       );
-      const totalPacks5k = calcExactPacks5k(totalToLoad);
+      const totalPacks5k = countPacks5k(visibleTerminals.map((t) => (t.refilled ? 0 : calcLoadAmountILS(t.balance, getEffectiveTargetK(t)))));
       const lines = [
         "*דוח מצב מסופים*",
         `סה"כ להטענה: ₪${formatAmountILS(totalToLoad)} | חבילות 5K מהבנק: ${totalPacks5k} | עסקאות מחצות: ${formatAmountILS(totalTxMidnight)}`,
@@ -2467,6 +2466,7 @@
       const byTerm = {};
       const byDay = {};
       const byDriver = {};
+      const packsByDay = {};
       lastReportRows.forEach((r) => {
         const k = r.terminalId;
         byTerm[k] = byTerm[k] || { name: r.terminalName || k, count: 0, sum: 0 };
@@ -2474,15 +2474,16 @@
         byTerm[k].sum += Number(r.amount || 0);
         const day = new Date(r.at).toLocaleDateString("he-IL");
         byDay[day] = (byDay[day] || 0) + Number(r.amount || 0);
+        packsByDay[day] = (packsByDay[day] || 0) + countPacks5k([r.amount]);
         const who = r.byName || r.byEmail || "—";
         byDriver[who] = (byDriver[who] || 0) + Number(r.amount || 0);
       });
       const termRows = Object.entries(byTerm).sort((a, b) => b[1].sum - a[1].sum)
         .map(([id, v]) => `<tr><td>${escapeHtml(v.name)}</td><td>${escapeHtml(id)}</td><td>${v.count}</td><td>₪${formatAmountILS(v.sum)}</td><td>₪${formatAmountILS(Math.round(v.sum / v.count))}</td></tr>`).join("");
-      const dayRows = Object.entries(byDay).map(([d, s]) => `<tr><td>${escapeHtml(d)}</td><td>₪${formatAmountILS(s)}</td><td>${calcExactPacks5k(s)}</td></tr>`).join("");
+      const dayRows = Object.entries(byDay).map(([d, s]) => `<tr><td>${escapeHtml(d)}</td><td>₪${formatAmountILS(s)}</td><td>${packsByDay[d] || 0}</td></tr>`).join("");
       const driverRows = Object.entries(byDriver).map(([w, s]) => `<tr><td>${escapeHtml(w)}</td><td>₪${formatAmountILS(s)}</td></tr>`).join("");
       out.innerHTML = `
-        <div style="color:#111827;font-weight:800;margin:6px 0;">סה"כ הוטען: ₪${formatAmountILS(total)} · ${lastReportRows.length} הטענות · ${calcExactPacks5k(total)} חבילות 5K</div>
+        <div style="color:#111827;font-weight:800;margin:6px 0;">סה"כ הוטען: ₪${formatAmountILS(total)} · ${lastReportRows.length} הטענות · ${countPacks5k(lastReportRows.map((r) => r.amount))} חבילות 5K</div>
         <table class="report-table"><tr><th>מסוף</th><th>מזהה</th><th>הטענות</th><th>סה"כ</th><th>ממוצע להטענה</th></tr>${termRows}</table>
         <table class="report-table"><tr><th>יום</th><th>סה"כ</th><th>חבילות 5K</th></tr>${dayRows}</table>
         <table class="report-table"><tr><th>עובד</th><th>סה"כ</th></tr>${driverRows}</table>`;
