@@ -756,12 +756,12 @@
       <section id="casPanel" class="panel sheet hidden" role="dialog" aria-modal="true">
         <div class="sheet-head"><strong>🏦 חיבור לכספונט</strong><button type="button" class="sheet-close" data-close-sheet aria-label="סגור">✕</button></div>
         <p class="status-note" style="margin:8px 0 0;">
-          💡 מומלץ להזין <b>יוזר מפתחות</b> (אפשר לבקש מכספונט) ולא את היוזר שאתה נכנס איתו לאתר:
-          כך תקלה בסנכרון לא תנעל אותך מהאתר. אחרי כישלון התחברות הסנכרון נעצר עד שתלחץ "שמור" שוב.
+          ⚠️ יש להתחבר <b>רק עם יוזר מפתחות</b> של כספונט (מבקשים אותו מכספונט) - לא עם היוזר והסיסמה שאתה נכנס איתם לאתר כספונט.
+          כך תקלה בסנכרון לא תנעל אותך מהאתר, והסיסמה האישית שלך לא נשמרת אצלנו. אחרי כישלון התחברות הסנכרון נעצר עד שתלחץ "שמור" שוב.
         </p>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:10px 0;">
-          <input id="casUserInput" aria-label="שם משתמש בכספונט" type="text" placeholder="שם משתמש בכספונט" autocomplete="username" />
-          <input id="casPassInput" aria-label="סיסמת כספונט" type="password" placeholder="סיסמת כספונט (נשמרת מוצפנת)" autocomplete="new-password" />
+          <input id="casUserInput" aria-label="שם משתמש בכספונט" type="text" placeholder="יוזר מפתחות בכספונט" autocomplete="username" />
+          <input id="casPassInput" aria-label="סיסמת כספונט" type="password" placeholder="סיסמת יוזר המפתחות (נשמרת מוצפנת)" autocomplete="new-password" />
         </div>
         <div id="casPassState" class="status-note" style="margin-bottom:8px;">🔒 הסיסמה מוצפנת בדפדפן לפני השמירה, ורק שרת הסנכרון יכול לפענח אותה.</div>
         <button id="saveAndSyncCasBtn" type="button" class="btn-primary">שמור ובקש סנכרון מכספונט</button>
