@@ -850,12 +850,15 @@
         </div>
         <hr style="border:none;border-top:1px solid var(--border);margin:14px 0 8px;" />
         <strong>📷 תמונה של המקום</strong>
-        <p class="status-note" style="margin:4px 0 0;">צלם את המסוף או את חזית העסק - עוזר לעובדים חדשים למצוא את המקום. התמונה מוצגת בחלון הניווט.</p>
+        <p class="status-note" style="margin:4px 0 0;">צלם או בחר מהגלריה תמונה של המסוף או של חזית העסק - עוזר לעובדים חדשים למצוא את המקום. התמונה מוצגת בחלון הניווט.</p>
         <img id="locPhoto" class="place-photo hidden" alt="תמונה של מקום המסוף (לחץ להגדלה)" />
         <div id="locPhotoStatus" class="status-note" style="margin-top:6px;"></div>
         <div class="photo-actions">
           <label class="photo-btn ghost-btn" role="button">📷 <span id="locPhotoBtnText">צלם תמונה</span>
             <input id="locPhotoInput" type="file" accept="image/*" capture="environment" aria-label="צילום תמונה של מקום המסוף" />
+          </label>
+          <label class="photo-btn ghost-btn" role="button">🖼️ <span>בחר מהגלריה</span>
+            <input id="locPhotoGalleryInput" type="file" accept="image/*" aria-label="בחירת תמונה מהגלריה" />
           </label>
           <button id="locPhotoDeleteBtn" type="button" class="ghost-btn hidden">🗑️ מחק תמונה</button>
         </div>
