@@ -1957,7 +1957,7 @@ function compressPhoto(file) {
   });
 }
 
-document.getElementById("locPhotoInput").addEventListener("change", async (e) => {
+async function onPlacePhotoPicked(e) {
   const input = e.currentTarget;
   const file = input.files && input.files[0];
   input.value = "";
@@ -1981,7 +1981,10 @@ document.getElementById("locPhotoInput").addEventListener("change", async (e) =>
   } catch (err) {
     status.textContent = "שמירת התמונה נכשלה: " + errorHe(err, err && err.message);
   }
-});
+}
+// צילום במצלמה או בחירה מהגלריה - אותו טיפול
+document.getElementById("locPhotoInput").addEventListener("change", onPlacePhotoPicked);
+document.getElementById("locPhotoGalleryInput").addEventListener("change", onPlacePhotoPicked);
 document.getElementById("locPhotoDeleteBtn").addEventListener("click", async () => {
   if (!navTerminalId || !guardWrite() || !confirm("למחוק את התמונה של המסוף?")) return;
   const tid = navTerminalId;
