@@ -580,7 +580,10 @@ function renderTerminalCard(t, index) {
       <div class="tc-top">
         <span class="row-index">${index + 1}</span>
         <div class="tc-name">
-          <div class="terminal-title">${safeName}</div>
+          <div class="title-row">
+            <button type="button" class="nav-btn${hasLocation(t) ? "" : " no-loc"}" data-act="navTerminal" data-id="${safeIdAttr}" aria-label="${hasLocation(t) ? "ניווט למסוף" : "הוספת מיקום למסוף"}" title="${hasLocation(t) ? "ניווט (Waze / Google Maps)" : "הוסף מיקום לניווט"}"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="#33ccff" stroke="#0b2a3a" stroke-width="1.4" d="M12 3.2c4.9 0 8.6 3.4 8.6 7.7 0 3.1-1.9 5.6-4.7 6.9l-.6 2.1c-.2.6-.9.8-1.4.4l-1.5-1.3c-.1 0-.3.1-.4.1-4.9 0-8.6-3.4-8.6-7.7S7.1 3.2 12 3.2z"/><circle cx="9.3" cy="10" r="1.1" fill="#0b2a3a"/><circle cx="14.7" cy="10" r="1.1" fill="#0b2a3a"/><path d="M9 13.1c.8.9 1.8 1.3 3 1.3s2.2-.4 3-1.3" fill="none" stroke="#0b2a3a" stroke-width="1.3" stroke-linecap="round"/></svg></button>
+            <div class="terminal-title">${safeName}</div>
+          </div>
           <div class="tc-sub">מזהה ${safeIdText} · סף ₪${threshold}</div>
         </div>
         <div class="tc-balance${isAlert && !isHidden ? " low" : ""}">
@@ -608,6 +611,7 @@ function renderTerminalCard(t, index) {
       <div class="tc-more">
         <button type="button" data-act="togglePaperRoll" data-id="${safeIdAttr}">🧻 ${paperNeeded ? "בטל סימון נייר" : "נגמר נייר"}</button>
         <button type="button" data-act="editTerminalNote" data-id="${safeIdAttr}">📝 ${noteText ? "ערוך הערה" : "הוסף הערה"}</button>
+        <button type="button" data-act="editLocation" data-id="${safeIdAttr}">📍 ${hasLocation(t) ? "עדכן מיקום" : "הוסף מיקום"}</button>
         <button type="button" class="owner-only" data-act="openEditTargetModal" data-id="${safeIdAttr}">🎯 יעד מילוי</button>
         <button type="button" class="owner-only" data-act="editTerminalThreshold" data-id="${safeIdAttr}">🔔 סף התראה</button>
         <button type="button" class="owner-only" data-act="moveTerminal" data-id="${safeIdAttr}" data-arg="-1">▲ הזז למעלה</button>
@@ -1517,6 +1521,97 @@ document.getElementById("inviteDriverBtn").addEventListener("click", async () =>
   }
 });
 
+// ---------- מיקום וניווט למסוף ----------
+function hasLocation(t) {
+  return Boolean(t && ((Number.isFinite(t.lat) && Number.isFinite(t.lng)) || String(t.address || "").trim()));
+}
+function navDestination(t) {
+  if (Number.isFinite(t.lat) && Number.isFinite(t.lng)) return { ll: `${t.lat},${t.lng}` };
+  return { q: String(t.address || "").trim() };
+}
+let navTerminalId = null;
+let locDraft = null; // { address, lat, lng, accuracy }
+
+window.navTerminal = function (id) {
+  const t = currentTerminals.find((x) => x.id === id);
+  if (!t) return;
+  if (!hasLocation(t)) { window.editLocation(id); return; }
+  navTerminalId = id;
+  const where = Number.isFinite(t.lat) ? "מיקום מדויק" : String(t.address);
+  document.getElementById("navTarget").textContent = `${t.name || id} · ${where}`;
+  openSheet("navPanel");
+};
+function openNav(app) {
+  const t = currentTerminals.find((x) => x.id === navTerminalId);
+  if (!t) return;
+  const d = navDestination(t);
+  const url = app === "waze"
+    ? (d.ll ? `https://waze.com/ul?ll=${d.ll}&navigate=yes` : `https://waze.com/ul?q=${encodeURIComponent(d.q)}&navigate=yes`)
+    : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(d.ll || d.q)}`;
+  closeSheets();
+  window.open(url, "_blank", "noopener");
+}
+document.getElementById("navWazeBtn").addEventListener("click", () => openNav("waze"));
+document.getElementById("navGoogleBtn").addEventListener("click", () => openNav("google"));
+document.getElementById("navEditBtn").addEventListener("click", () => window.editLocation(navTerminalId));
+
+function renderLocCoords() {
+  const el = document.getElementById("locCoords");
+  el.textContent = locDraft && Number.isFinite(locDraft.lat)
+    ? `📍 מיקום מדויק נשמר: ${locDraft.lat.toFixed(5)}, ${locDraft.lng.toFixed(5)}${locDraft.accuracy ? ` (דיוק כ-${Math.round(locDraft.accuracy)} מ')` : ""}`
+    : "אין מיקום מדויק שמור.";
+}
+window.editLocation = function (id) {
+  const t = currentTerminals.find((x) => x.id === id);
+  if (!t) return;
+  navTerminalId = id;
+  locDraft = { address: String(t.address || ""), lat: Number.isFinite(t.lat) ? t.lat : null, lng: Number.isFinite(t.lng) ? t.lng : null, accuracy: null };
+  document.getElementById("locTerminalName").textContent = `${t.name || id} (מזהה ${id})`;
+  document.getElementById("locAddressInput").value = locDraft.address;
+  renderLocCoords();
+  openSheet("locationPanel");
+};
+document.getElementById("locHereBtn").addEventListener("click", () => {
+  if (!navigator.geolocation) { alert("הדפדפן לא תומך באיתור מיקום."); return; }
+  const btn = document.getElementById("locHereBtn");
+  btn.disabled = true;
+  btn.textContent = "מאתר מיקום...";
+  navigator.geolocation.getCurrentPosition((pos) => {
+    locDraft.lat = Number(pos.coords.latitude.toFixed(6));
+    locDraft.lng = Number(pos.coords.longitude.toFixed(6));
+    locDraft.accuracy = pos.coords.accuracy;
+    renderLocCoords();
+    btn.disabled = false;
+    btn.textContent = "📡 שמור את המיקום המדויק שלי עכשיו";
+    showToast("המיקום אותר - לחץ \"שמור מיקום\"");
+  }, (err) => {
+    btn.disabled = false;
+    btn.textContent = "📡 שמור את המיקום המדויק שלי עכשיו";
+    alert(err && err.code === 1
+      ? "אין הרשאת מיקום. אפשר אותה בהגדרות הדפדפן/הטלפון לאתר הזה ונסה שוב."
+      : "לא הצלחנו לאתר מיקום. נסה שוב במקום פתוח.");
+  }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+});
+async function saveLocation(data) {
+  if (!dataUid || !navTerminalId) return;
+  try {
+    await db.collection("distributors").doc(dataUid).collection("terminals").doc(navTerminalId).update(data);
+    closeSheets();
+    showToast("המיקום נשמר ✓");
+  } catch (err) {
+    alert("שמירת המיקום נכשלה: " + errorHe(err, err && err.message));
+  }
+}
+document.getElementById("locSaveBtn").addEventListener("click", () => {
+  const address = document.getElementById("locAddressInput").value.trim().slice(0, 200);
+  if (!address && !Number.isFinite(locDraft.lat)) { alert("הזן כתובת או שמור מיקום מדויק."); return; }
+  saveLocation({ address: address || null, lat: Number.isFinite(locDraft.lat) ? locDraft.lat : null, lng: Number.isFinite(locDraft.lng) ? locDraft.lng : null, locationAt: Date.now() });
+});
+document.getElementById("locClearBtn").addEventListener("click", () => {
+  if (!confirm("למחוק את המיקום של המסוף?")) return;
+  saveLocation({ address: null, lat: null, lng: null, locationAt: Date.now() });
+});
+
 // ---------- חבר מביא חבר ----------
 function referralLink() {
   return dataUid ? `${SITE_URL}?ref=${encodeURIComponent(dataUid)}` : "";
@@ -1768,7 +1863,7 @@ auth.onAuthStateChanged((user) => {
 });
   
 // לחיצות בכרטיסי המסופים (במקום onclick בתוך ה-HTML - מאפשר מדיניות אבטחת תוכן קשיחה)
-const CARD_ACTIONS = ["toggleTerminalSector","togglePaperRoll","editTerminalNote","toggleCompleted","toggleMore","openEditTargetModal","editTerminalThreshold","moveTerminal","toggleHidden"];
+const CARD_ACTIONS = ["navTerminal", "editLocation", "toggleTerminalSector","togglePaperRoll","editTerminalNote","toggleCompleted","toggleMore","openEditTargetModal","editTerminalThreshold","moveTerminal","toggleHidden"];
 document.addEventListener("click", (e) => {
   const btn = e.target.closest("[data-act]");
   if (!btn || !CARD_ACTIONS.includes(btn.dataset.act)) return;
