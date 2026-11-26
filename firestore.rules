@@ -125,6 +125,14 @@ service cloud.firestore {
         allow update, delete: if false;
       }
 
+      // מיקום מסוף לניווט: כתובת (עד 200 תווים) ו/או קואורדינטות
+      function validLocation(d) {
+        return (!('address' in d) || d.address == null || (d.address is string && d.address.size() <= 200))
+          && (!('lat' in d) || d.lat == null || (d.lat is number && d.lat >= -90 && d.lat <= 90))
+          && (!('lng' in d) || d.lng == null || (d.lng is number && d.lng >= -180 && d.lng <= 180))
+          && (!('locationAt' in d) || d.locationAt == null || d.locationAt is int);
+      }
+
       match /terminals/{tid} {
         allow read: if ownerOrDriver(uid);
         // מסופים נוצרים ע"י הסנכרון בלבד
@@ -134,9 +142,11 @@ service cloud.firestore {
           (isOwner(uid)
             && changedKeys().hasOnly([
                  'sector', 'paperRollNeeded', 'threshold', 'notes', 'baseTargetK',
-                 'refilled', 'lastRefilledAt', 'lastRefillId', 'hidden', 'order'
+                 'refilled', 'lastRefilledAt', 'lastRefillId', 'hidden', 'order',
+                 'address', 'lat', 'lng', 'locationAt'
                ])
             && validNotes(request.resource.data)
+            && validLocation(request.resource.data)
             && (!('threshold' in changedKeys()) || (request.resource.data.threshold is number && request.resource.data.threshold >= 0))
             && (!('baseTargetK' in changedKeys()) || request.resource.data.baseTargetK == null
                 || (request.resource.data.baseTargetK is number && request.resource.data.baseTargetK >= 0 && request.resource.data.baseTargetK <= 1000))
@@ -144,8 +154,10 @@ service cloud.firestore {
             && (!('hidden' in changedKeys()) || request.resource.data.hidden is bool)
             && (!('order' in changedKeys()) || (request.resource.data.order is int && request.resource.data.order >= 0 && request.resource.data.order <= 10000)))
           || (isDriverOf(uid)
-            && changedKeys().hasOnly(['paperRollNeeded', 'notes', 'refilled', 'lastRefilledAt', 'lastRefillId'])
-            && validNotes(request.resource.data))
+            && changedKeys().hasOnly(['paperRollNeeded', 'notes', 'refilled', 'lastRefilledAt', 'lastRefillId',
+                                      'address', 'lat', 'lng', 'locationAt'])
+            && validNotes(request.resource.data)
+            && validLocation(request.resource.data))
         );
       }
 
