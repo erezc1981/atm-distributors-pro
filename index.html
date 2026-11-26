@@ -199,6 +199,10 @@
     .nav-choice { display: grid; gap: 8px; margin-top: 10px; }
     .nav-choice button { display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 800; padding: 12px; }
     .loc-coords { font-size: 0.82rem; color: var(--muted); margin-top: 6px; }
+    .fault-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 0.92rem; }
+    .fault-table th, .fault-table td { border-bottom: 1px solid var(--border); padding: 8px 6px; text-align: right; vertical-align: top; }
+    .fault-table th { font-size: 0.8rem; color: var(--muted); }
+    .fault-code { font-weight: 900; font-size: 1.05rem; color: #1d4ed8; white-space: nowrap; width: 3.2em; }
     .chip-offline { background: #fef2f2; color: #b91c1c; border-color: #fecaca; font-weight: 700; }
 
     /* כרטיס סיכום */
@@ -715,6 +719,7 @@
         <button id="toggleDriversBtn" type="button" class="menu-item owner-only">👥 <span>עובדים</span></button>
         <button id="toggleReferralBtn" type="button" class="menu-item owner-only">🎁 <span>חבר מביא חבר</span></button>
         <button id="openPayModalBtn" type="button" class="menu-item owner-only">💳 <span>שדרוג / תשלום</span></button>
+        <button id="toggleFaultsBtn" type="button" class="menu-item">🛠️ <span>קודי תקלות</span></button>
         <a id="adminLink" href="admin.html" class="menu-item hidden">⚙️ <span>ניהול מנויים</span></a>
         <a href="terms.html" target="_blank" rel="noopener" class="menu-item">📄 <span>תנאי שימוש ופרטיות</span></a>
         <a href="accessibility.html" target="_blank" rel="noopener" class="menu-item">♿ <span>הצהרת נגישות</span></a>
@@ -761,6 +766,17 @@
           <button id="inviteDriverBtn" type="button" class="btn-primary">שלח הזמנה</button>
         </div>
         <div id="driversList" class="status-note"></div>
+      </section>
+
+      <!-- קודי תקלות -->
+      <section id="faultsPanel" class="panel sheet hidden" role="dialog" aria-modal="true">
+        <div class="sheet-head"><strong>🛠️ קודי תקלות</strong><button type="button" class="sheet-close" data-close-sheet aria-label="סגור">✕</button></div>
+        <input id="faultSearchInput" aria-label="חיפוש קוד או תקלה" type="search" inputmode="search" placeholder="🔍 הקלד קוד (למשל 41) או מילה (מחסנית)" style="margin-top:8px;" />
+        <table class="fault-table">
+          <thead><tr><th scope="col">קוד</th><th scope="col">סוג התקלה</th></tr></thead>
+          <tbody id="faultRows"></tbody>
+        </table>
+        <div id="faultEmpty" class="status-note hidden" style="margin-top:8px;">לא נמצא קוד מתאים.</div>
       </section>
 
       <!-- ניווט למסוף -->
