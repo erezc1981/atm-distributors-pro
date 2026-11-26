@@ -706,6 +706,7 @@
         <button id="toggleCasBtn" type="button" class="menu-item owner-only">🏦 <span>חיבור לכספונט</span></button>
         <button id="toggleAlertsBtn" type="button" class="menu-item owner-only">🔔 <span>התראות וואטסאפ</span></button>
         <button id="toggleDriversBtn" type="button" class="menu-item owner-only">👥 <span>עובדים</span></button>
+        <button id="toggleReferralBtn" type="button" class="menu-item owner-only">🎁 <span>חבר מביא חבר</span></button>
         <button id="openPayModalBtn" type="button" class="menu-item owner-only">💳 <span>שדרוג / תשלום</span></button>
         <a id="adminLink" href="admin.html" class="menu-item hidden">⚙️ <span>ניהול מנויים</span></a>
         <a href="terms.html" target="_blank" rel="noopener" class="menu-item">📄 <span>תנאי שימוש ופרטיות</span></a>
@@ -753,6 +754,21 @@
           <button id="inviteDriverBtn" type="button" class="btn-primary">שלח הזמנה</button>
         </div>
         <div id="driversList" class="status-note"></div>
+      </section>
+
+      <!-- חבר מביא חבר -->
+      <section id="referralPanel" class="panel sheet hidden" role="dialog" aria-modal="true">
+        <div class="sheet-head"><strong>🎁 חבר מביא חבר</strong><button type="button" class="sheet-close" data-close-sheet aria-label="סגור">✕</button></div>
+        <p class="status-note" style="margin:8px 0;">
+          שלח את הקישור האישי שלך למפיץ חבר. כשהוא נרשם דרך הקישור ומשלם את התשלום הראשון, <b>שניכם מקבלים חודש חינם</b>:
+          אתה מקבל חודש נוסף למנוי, והחבר מקבל את החודש השני חינם (עד 12 חודשי מתנה בשנה).
+        </p>
+        <input id="referralLinkInput" aria-label="הקישור האישי שלך" type="text" readonly dir="ltr" style="text-align:left;" />
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+          <button id="copyReferralBtn" type="button" class="btn-primary">📋 העתק קישור</button>
+          <button id="shareReferralBtn" type="button">💬 שלח בוואטסאפ</button>
+        </div>
+        <div id="referralStats" class="status-note" style="margin-top:10px;"></div>
       </section>
 
       <!-- דוחות הטענה -->
@@ -880,17 +896,18 @@
       <div id="payTrialSummary" class="status-note"></div>
 
       <div class="plan-grid">
-        <div class="plan-option selected" data-plan="monthly" data-price="₪99 / חודש">
+        <div class="plan-option selected" data-plan="monthly" data-price="₪29 / חודש">
           <div style="font-weight:800;">חודשי</div>
-          <div style="font-size:1.1rem;font-weight:900;color:#1d4ed8;margin-top:4px;">₪99 / חודש</div>
+          <div id="priceMonthly" style="font-size:1.1rem;font-weight:900;color:#1d4ed8;margin-top:4px;">₪29 / חודש</div>
           <div class="status-note">גמיש ללא התחייבות</div>
         </div>
-        <div class="plan-option" data-plan="yearly" data-price="₪890 / שנה">
-          <div style="font-weight:800;">שנתי (חודשיים מתנה)</div>
-          <div style="font-size:1.1rem;font-weight:900;color:#15803d;margin-top:4px;">₪890 / שנה</div>
-          <div class="status-note">חיסכון שנתי</div>
+        <div class="plan-option" data-plan="yearly" data-price="₪319 / שנה">
+          <div style="font-weight:800;">שנתי (חודש מתנה)</div>
+          <div id="priceYearly" style="font-size:1.1rem;font-weight:900;color:#15803d;margin-top:4px;">₪319 / שנה</div>
+          <div class="status-note">11 חודשים בתשלום</div>
         </div>
       </div>
+      <div id="tierNote" class="status-note" style="margin-top:6px;"></div>
 
       <input id="payerPhoneInput" aria-label="טלפון ליצירת קשר" type="tel" placeholder="טלפון ליצירת קשר / קבלה" />
       <button id="confirmPaymentBtn" type="button" class="btn-primary">המשך לתשלום / שלח בקשת שדרוג</button>
