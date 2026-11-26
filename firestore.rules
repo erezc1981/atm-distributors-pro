@@ -81,7 +81,11 @@ service cloud.firestore {
 
       // הרשמה: רק פרופיל ניסיון של עד 30 יום, עם זמן יצירה אמיתי ואישור תנאי שימוש
       allow create: if isOwner(uid)
-        && request.resource.data.keys().hasOnly(['email', 'subscriptionStatus', 'createdAt', 'trialEndsAt', 'termsAcceptedAt', 'termsVersion'])
+        && request.resource.data.keys().hasOnly(['email', 'subscriptionStatus', 'createdAt', 'trialEndsAt', 'termsAcceptedAt', 'termsVersion', 'referredBy'])
+        // חבר מביא חבר: מזהה המפיץ שהזמין (לא את עצמו)
+        && (!('referredBy' in request.resource.data) || (request.resource.data.referredBy is string
+            && request.resource.data.referredBy.size() >= 10 && request.resource.data.referredBy.size() <= 40
+            && request.resource.data.referredBy != uid))
         && request.resource.data.subscriptionStatus == 'trial'
         && request.resource.data.createdAt is int
         && request.resource.data.trialEndsAt is int
@@ -97,7 +101,10 @@ service cloud.firestore {
       allow update: if (isOwner(uid)
         && changedKeys().hasOnly(['upgradeRequest', 'email']))
         || (isAdmin()
-        && changedKeys().hasOnly(['subscriptionStatus', 'currentPeriodEnd', 'plan', 'trialEndsAt', 'upgradeRequest'])
+        && changedKeys().hasOnly(['subscriptionStatus', 'currentPeriodEnd', 'plan', 'trialEndsAt', 'upgradeRequest',
+                                  'referralRewardedAt', 'referralCount', 'referralYear', 'referralYearCount'])
+        && (request.resource.data.get('referralCount', 0) is int)
+        && (request.resource.data.get('referralYearCount', 0) is int)
         && request.resource.data.get('subscriptionStatus', 'trial') in ['trial', 'active', 'canceled']
         && (request.resource.data.get('currentPeriodEnd', null) == null || request.resource.data.currentPeriodEnd is int)
         && (request.resource.data.get('trialEndsAt', null) == null || request.resource.data.trialEndsAt is int)

@@ -11,7 +11,16 @@ const firebaseConfig = {
 };
 // ההרשאה האמיתית נאכפת ב-firestore.rules (isAdmin); כאן רק לתצוגה
 const ADMIN_UID = "TblW8UHDSBTh91BCJcqo3YKEqQJ3";
-const PRICES = { monthly: 99, yearly: 890 };
+// מחירון לפי מספר מסופים (לא כולל מע"מ; שנתי = 11 חודשים) - זהה לאפליקציה
+const PRICE_TIERS = [
+  { max: 20, name: "בסיס", monthly: 29, yearly: 319 },
+  { max: 50, name: "מקצועי", monthly: 49, yearly: 539 },
+  { max: 100, name: "מתקדם", monthly: 79, yearly: 869 },
+  { max: 200, name: "עסקי", monthly: 119, yearly: 1309 },
+  { max: Infinity, name: "ללא הגבלה", monthly: 179, yearly: 1969 }
+];
+const tierFor = (count) => PRICE_TIERS.find((t) => Number(count || 0) <= t.max) || PRICE_TIERS[PRICE_TIERS.length - 1];
+const REFERRAL_YEAR_CAP = 12; // עד 12 חודשי מתנה בשנה לממליץ
 const DAY = 86400000;
 
 firebase.initializeApp(firebaseConfig);
@@ -68,7 +77,8 @@ function renderStats() {
   document.getElementById("sPending").textContent = rows.filter((r) => isPending(r.p)).length;
   const mrr = rows.reduce((acc, r) => {
     if (statusOf(r.p).key !== "active") return acc;
-    return acc + (r.p.plan === "yearly" ? PRICES.yearly / 12 : PRICES.monthly);
+    const t = tierFor(r.cas && r.cas.lastSyncCount);
+    return acc + (r.p.plan === "yearly" ? t.yearly / 12 : t.monthly);
   }, 0);
   document.getElementById("sMrr").textContent = `₪${Math.round(mrr).toLocaleString("he-IL")}`;
 }
@@ -106,6 +116,11 @@ function renderCard(r) {
   const req = p.upgradeRequest || {};
   const pending = isPending(p);
   const owner = s.key === "owner";
+  const tier = tierFor(cas && cas.lastSyncCount);
+  const referrer = p.referredBy ? rows.find((x) => x.uid === p.referredBy) : null;
+  const refLine = p.referredBy
+    ? `🎁 הוזמן ע"י ${esc(referrer ? referrer.p.email || referrer.uid : p.referredBy)}${p.referralRewardedAt ? " (חודש המתנה ניתן)" : " - יקבלו חודש מתנה בתשלום הראשון"}`
+    : "";
   const sync = cas
     ? (cas.lastSyncError
         ? `<span class="error">שגיאת סנכרון: ${esc(cas.lastSyncError)}</span>`
@@ -125,6 +140,9 @@ function renderCard(r) {
         <span>${s.key === "trial" || (s.key === "expired" && !p.currentPeriodEnd) ? "סוף ניסיון" : "בתוקף עד"}: ${owner ? "ללא הגבלה" : fmtDate(s.end)}</span>
         <span>${sync}</span>
         ${p.adminNote ? `<span>📝 ${esc(p.adminNote)}</span>` : ""}
+        ${owner ? "" : `<span>מסלול: ${esc(tier.name)}</span>`}
+        ${refLine ? `<span>${refLine}</span>` : ""}
+        ${p.referralCount ? `<span>👥 הביא ${esc(p.referralCount)} חברים משלמים</span>` : ""}
       </div>
       ${req.requestedAt ? `
         <div class="request">
@@ -133,8 +151,8 @@ function renderCard(r) {
         </div>` : ""}
       ${owner ? "" : `
       <div class="actions">
-        <button type="button" class="btn-green" data-act="activate" data-plan="monthly">✅ הפעל חודשי (₪${PRICES.monthly})</button>
-        <button type="button" class="btn-green" data-act="activate" data-plan="yearly">✅ הפעל שנתי (₪${PRICES.yearly})</button>
+        <button type="button" class="btn-green" data-act="activate" data-plan="monthly">✅ הפעל חודשי (₪${tier.monthly} + מע"מ)</button>
+        <button type="button" class="btn-green" data-act="activate" data-plan="yearly">✅ הפעל שנתי (₪${tier.yearly.toLocaleString("he-IL")} + מע"מ)</button>
         <button type="button" data-act="trial">⏳ הארך ניסיון</button>
         ${pending ? `<button type="button" data-act="handled">✔️ סמן בקשה כטופלה</button>` : ""}
         <button type="button" data-act="note">📝 הערה</button>
@@ -184,22 +202,58 @@ async function activate(uid, plan) {
   const now = Date.now();
   const currentEnd = p.subscriptionStatus === "active" ? Number(p.currentPeriodEnd) || 0 : 0;
   const base = Math.max(now, currentEnd);
-  const end = addMonths(base, plan === "yearly" ? 12 : 1);
-  const amountStr = prompt(`סכום ששולם (₪) עבור ${p.email || uid}:`, String(PRICES[plan]));
+  const tier = tierFor(r.cas && r.cas.lastSyncCount);
+  // חבר מביא חבר: בתשלום הראשון של מפיץ שהוזמן - חודש מתנה לו ולממליץ
+  const referral = p.referredBy && !p.referralRewardedAt ? rows.find((x) => x.uid === p.referredBy) || null : null;
+  const giftFriend = Boolean(p.referredBy && !p.referralRewardedAt);
+  const end = addMonths(base, (plan === "yearly" ? 12 : 1) + (giftFriend ? 1 : 0));
+  const amountStr = prompt(`סכום ששולם (₪, לפני מע"מ) עבור ${p.email || uid} - מסלול ${tier.name}:`, String(tier[plan]));
   if (amountStr === null) return;
   const amount = Number(String(amountStr).replace(/[,₪\s]/g, ""));
   if (!Number.isFinite(amount) || amount < 0) { alert("סכום לא תקין"); return; }
   const note = (prompt("הערה לתשלום (אופציונלי, למשל אמצעי תשלום / מספר קבלה):", "") || "").slice(0, 200);
-  if (!confirm(`להפעיל מנוי ${plan === "yearly" ? "שנתי" : "חודשי"} ל-${p.email || uid} עד ${fmtDate(end)}?`)) return;
+  const giftText = giftFriend
+    ? `\n🎁 חבר מביא חבר: כולל חודש מתנה למפיץ${referral ? `, וחודש מתנה לממליץ (${referral.p.email || referral.uid})` : ""}.`
+    : "";
+  if (!confirm(`להפעיל מנוי ${plan === "yearly" ? "שנתי" : "חודשי"} ל-${p.email || uid} עד ${fmtDate(end)}?${giftText}`)) return;
 
   const ref = db.collection("distributors").doc(uid);
   const batch = db.batch();
   const update = { subscriptionStatus: "active", plan, currentPeriodEnd: end };
   if (isPending(p)) update["upgradeRequest.handledAt"] = now;
+  if (giftFriend) update.referralRewardedAt = now;
   batch.update(ref, update);
-  batch.set(ref.collection("payments").doc(), { amount, plan, periodEnd: end, paidAt: now, ...(note ? { note } : {}) });
+  const payNote = [note, giftFriend ? "כולל חודש מתנה (חבר מביא חבר)" : ""].filter(Boolean).join(" · ").slice(0, 200);
+  batch.set(ref.collection("payments").doc(), { amount, plan, periodEnd: end, paidAt: now, ...(payNote ? { note: payNote } : {}) });
+  if (referral) addReferrerGift(batch, referral, p.email || uid, now);
   await batch.commit();
   delete paymentsCache[uid];
+}
+
+// חודש מתנה לממליץ: מאריך מנוי פעיל או ניסיון, סופר, ורושם בהיסטוריית התשלומים (₪0)
+function addReferrerGift(batch, referral, friendLabel, now) {
+  const rp = referral.p;
+  const ref = db.collection("distributors").doc(referral.uid);
+  const year = new Date(now).getFullYear();
+  const yearCount = rp.referralYear === year ? Number(rp.referralYearCount) || 0 : 0;
+  const upd = { referralCount: (Number(rp.referralCount) || 0) + 1, referralYear: year, referralYearCount: yearCount + 1 };
+  let giftEnd = null;
+  if (rp.plan !== "owner_free" && yearCount < REFERRAL_YEAR_CAP) {
+    if (rp.subscriptionStatus === "active") {
+      giftEnd = addMonths(Math.max(now, Number(rp.currentPeriodEnd) || 0), 1);
+      upd.currentPeriodEnd = giftEnd;
+    } else if (rp.subscriptionStatus !== "canceled") {
+      giftEnd = Math.max(now, Number(rp.trialEndsAt) || 0) + 30 * DAY;
+      upd.trialEndsAt = giftEnd;
+    }
+  }
+  batch.update(ref, upd);
+  if (giftEnd) {
+    batch.set(ref.collection("payments").doc(), {
+      amount: 0, plan: "other", periodEnd: giftEnd, paidAt: now,
+      note: `חודש מתנה - חבר מביא חבר (${String(friendLabel).slice(0, 120)})`
+    });
+  }
 }
 
 async function extendTrial(uid) {

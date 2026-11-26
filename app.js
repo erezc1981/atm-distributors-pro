@@ -20,7 +20,28 @@ const db = firebase.firestore();
 db.enablePersistence({ synchronizeTabs: true }).catch((err) => console.warn("offline persistence unavailable:", err && err.code));
 
 const ADMIN_UID = "TblW8UHDSBTh91BCJcqo3YKEqQJ3";
-const TERMS_VERSION = "2026-11-24";
+const TERMS_VERSION = "2026-11-26";
+
+// ---------- מחירון לפי מספר מסופים (לא כולל מע"מ; שנתי = 11 חודשים) ----------
+const PRICE_TIERS = [
+  { max: 20, name: "בסיס", monthly: 29, yearly: 319 },
+  { max: 50, name: "מקצועי", monthly: 49, yearly: 539 },
+  { max: 100, name: "מתקדם", monthly: 79, yearly: 869 },
+  { max: 200, name: "עסקי", monthly: 119, yearly: 1309 },
+  { max: Infinity, name: "ללא הגבלה", monthly: 179, yearly: 1969 }
+];
+function tierFor(count) {
+  return PRICE_TIERS.find((t) => Number(count || 0) <= t.max) || PRICE_TIERS[PRICE_TIERS.length - 1];
+}
+
+// ---------- חבר מביא חבר: שומרים את הקוד מהקישור עד ההרשמה ----------
+const SITE_URL = "https://erezc1981.github.io/atm-distributors-pro/";
+(function captureReferral() {
+  const ref = new URLSearchParams(location.search).get("ref");
+  if (ref && /^[A-Za-z0-9]{10,40}$/.test(ref)) {
+    try { localStorage.setItem("atm_ref", ref); } catch (e) { /* ignore */ }
+  }
+})();
 let dataUid = null;      // של מי הנתונים שמוצגים: המפיץ עצמו, או המפיץ שהזמין את העובד
 let userRole = "owner";  // "owner" (מפיץ) או "driver" (עובד)
 let workerName = "";     // שם העובד המחובר (נרשם בכל הטענה); למפיץ - "המפיץ"
@@ -63,7 +84,7 @@ let searchQuery = "";
 let unsubscribeTerminals = null;
 let unsubscribeCas = null;
 let unsubscribeProfile = null;
-let selectedPlan = { id: "monthly", label: "חודשי (₪99 / חודש)" };
+let selectedPlan = { id: "monthly", label: "חודשי (₪29 / חודש)" };
 let subscriptionValid = true;
 
 // מפתח ציבורי להצפנת סיסמת כספונט (RSA-OAEP SHA-256). המפתח הפרטי נמצא רק ב-GitHub Secret של הסנכרון.
@@ -911,6 +932,7 @@ function bindUserListeners(uid) {
   unsubscribeProfile = userRef.onSnapshot((snap) => {
     const data = snap.exists ? (snap.data() || {}) : {};
     updateTrialPill(data);
+    updateReferralStats(data);
   }, (err) => console.warn("profile listener:", err && err.code));
 
   // ימי קו + בחירת התאמות חישוב שנשמרה (גם לעובדים - לקריאה בלבד)
@@ -975,8 +997,24 @@ function bindUserListeners(uid) {
   });
 }
 
+function renderPriceTier() {
+  const tier = tierFor(currentTerminals.length);
+  const m = `₪${tier.monthly} / חודש`;
+  const y = `₪${tier.yearly.toLocaleString("he-IL")} / שנה`;
+  document.getElementById("priceMonthly").textContent = m;
+  document.getElementById("priceYearly").textContent = y;
+  document.querySelector('.plan-option[data-plan="monthly"]').setAttribute("data-price", m);
+  document.querySelector('.plan-option[data-plan="yearly"]').setAttribute("data-price", y);
+  const sel = document.querySelector(".plan-option.selected") || document.querySelector(".plan-option");
+  selectedPlan = { id: sel.getAttribute("data-plan"), label: `${sel.children[0].textContent} - ${tier.name} (${sel.getAttribute("data-price")})` };
+  const range = tier.max === Infinity ? "" : `, עד ${tier.max}`;
+  document.getElementById("tierNote").textContent =
+    `מסלול ${tier.name} (${currentTerminals.length} מסופים${range}). המחירים לא כוללים מע"מ.`;
+}
+
 document.getElementById("openPayModalBtn").addEventListener("click", () => {
   closeSheets();
+  renderPriceTier();
   document.getElementById("paymentFeedback").textContent = "";
   document.getElementById("paymentModal").classList.remove("hidden");
 });
@@ -989,10 +1027,7 @@ document.querySelectorAll(".plan-option").forEach((el) => {
   el.addEventListener("click", () => {
     document.querySelectorAll(".plan-option").forEach((o) => o.classList.remove("selected"));
     el.classList.add("selected");
-    selectedPlan = {
-      id: el.getAttribute("data-plan"),
-      label: `${el.children[0].textContent} (${el.getAttribute("data-price")})`
-    };
+    renderPriceTier();
   });
 });
 
@@ -1097,6 +1132,12 @@ document.getElementById("forgotBtn").addEventListener("click", async () => {
   infoEl.textContent = "אם קיים חשבון עם האימייל הזה, נשלח אליו קישור לאיפוס סיסמה. בדוק גם בספאם.";
 });
 
+function referralField(uid) {
+  let ref = "";
+  try { ref = localStorage.getItem("atm_ref") || ""; } catch (e) { /* ignore */ }
+  return /^[A-Za-z0-9]{10,40}$/.test(ref) && ref !== uid ? { referredBy: ref } : {};
+}
+
 document.getElementById("registerBtn").addEventListener("click", async () => {
   const errEl = document.getElementById("authError");
   errEl.textContent = "";
@@ -1119,8 +1160,10 @@ document.getElementById("registerBtn").addEventListener("click", async () => {
       createdAt: now,
       trialEndsAt: now + TRIAL_DAYS_DEFAULT * 24 * 60 * 60 * 1000,
       termsAcceptedAt: now,
-      termsVersion: TERMS_VERSION
+      termsVersion: TERMS_VERSION,
+      ...referralField(cred.user.uid)
     });
+    try { localStorage.removeItem("atm_ref"); } catch (e) { /* ignore */ }
     // הפרופיל נוצר אחרי ש-onAuthStateChanged כבר רץ - טוענים מחדש את התפקיד
     await startSession(cred.user);
   } catch (err) {
@@ -1472,6 +1515,37 @@ document.getElementById("inviteDriverBtn").addEventListener("click", async () =>
   } catch (err) {
     alert(errorHe(err, "ההזמנה נכשלה (ייתכן שהאימייל כבר הוזמן ע\"י מפיץ אחר)"));
   }
+});
+
+// ---------- חבר מביא חבר ----------
+function referralLink() {
+  return dataUid ? `${SITE_URL}?ref=${encodeURIComponent(dataUid)}` : "";
+}
+function updateReferralStats(profile = {}) {
+  const el = document.getElementById("referralStats");
+  if (!el) return;
+  const n = Number(profile.referralCount) || 0;
+  el.textContent = n
+    ? `🎉 ${n} חברים הצטרפו ושילמו דרך הקישור שלך - קיבלת ${n} חודשי מתנה.`
+    : "עדיין לא הצטרף אף חבר דרך הקישור שלך.";
+}
+document.getElementById("toggleReferralBtn").addEventListener("click", () => {
+  document.getElementById("referralLinkInput").value = referralLink();
+  toggleSheet("referralPanel");
+});
+document.getElementById("copyReferralBtn").addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(referralLink());
+    showToast("הקישור הועתק ✓");
+  } catch (e) {
+    document.getElementById("referralLinkInput").select();
+    showToast("סמן והעתק את הקישור");
+  }
+});
+document.getElementById("shareReferralBtn").addEventListener("click", () => {
+  const text = "היי, אני עובד עם מערכת לניהול קו כספומטים שמתחברת לכספונט: מחשבת כמה להטעין בכל מסוף ושולחת התראות בוואטסאפ. "
+    + "נרשמים דרך הקישור שלי ומקבלים חודש ניסיון חינם, ועוד חודש מתנה אחרי התשלום הראשון:\n" + referralLink();
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener");
 });
 
 document.getElementById("toggleDriversBtn").addEventListener("click", () => {
