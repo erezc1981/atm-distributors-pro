@@ -43,6 +43,11 @@ service cloud.firestore {
       return isOwner(uid) || isDriverOf(uid);
     }
 
+    // עובד רואה את נתוני הקו רק כשהמנוי של המפיץ בתוקף
+    function ownerOrActiveDriver(uid) {
+      return isOwner(uid) || (isDriverOf(uid) && hasValidSub(uid));
+    }
+
     function profile(uid) {
       return get(/databases/$(database)/documents/distributors/$(uid)).data;
     }
@@ -134,7 +139,7 @@ service cloud.firestore {
       }
 
       match /terminals/{tid} {
-        allow read: if ownerOrDriver(uid);
+        allow read: if ownerOrActiveDriver(uid);
         // מסופים נוצרים ע"י הסנכרון בלבד
         allow create, delete: if false;
         // מפיץ: כל שדות הניהול. עובד: רק הטענה, נייר והערות.
@@ -163,7 +168,7 @@ service cloud.firestore {
 
       // היסטוריית הטענות: נרשמת ע"י המפיץ או העובד, לא ניתנת לעריכה
       match /refills/{rid} {
-        allow read: if ownerOrDriver(uid);
+        allow read: if ownerOrActiveDriver(uid);
         allow create: if ownerOrDriver(uid)
           && hasValidSub(uid)
           && request.resource.data.keys().hasOnly(['terminalId', 'terminalName', 'amount', 'balanceBefore', 'at', 'byUid', 'byEmail', 'byName'])
@@ -185,7 +190,7 @@ service cloud.firestore {
 
       // היסטוריה יומית (נכתבת ע"י מנוע הסנכרון): בסיס למגמות ותחזיות
       match /daily/{day} {
-        allow read: if ownerOrDriver(uid);
+        allow read: if ownerOrActiveDriver(uid);
         allow write: if false;
       }
 
@@ -204,7 +209,7 @@ service cloud.firestore {
       // ימי קו + מצבי חישוב (חג/רמדאן וכו'). עדכון בודק רק את השדות שמשתנים,
       // כך שמסמך ישן עם שדות נוספים (activeDays) לא חוסם שמירה.
       match /settings/route {
-        allow read: if ownerOrDriver(uid);
+        allow read: if ownerOrActiveDriver(uid);
         allow create: if isOwner(uid)
           && hasValidSub(uid)
           && request.resource.data.keys().hasOnly(['days', 'updatedAt', 'calcModes'])

@@ -2,7 +2,7 @@
 // דפי האפליקציה: קודם רשת (כדי לקבל עדכונים), ובלי רשת - העותק השמור.
 // ספריות Firebase (כתובת עם גרסה קבועה): מהמטמון, ובפעם הראשונה מהרשת.
 // נתוני Firestore עצמם נשמרים ע"י Firebase (enablePersistence) ולא כאן.
-const CACHE = "atm-shell-v9";
+const CACHE = "atm-shell-v10";
 const SHELL = ["./", "./index.html", "./manifest.json", "./terms.html", "./privacy.html", "./accessibility.html", "./app.js"];
 const FIREBASE_LIBS = [
   "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js",

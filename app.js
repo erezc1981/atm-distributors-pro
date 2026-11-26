@@ -126,8 +126,36 @@ function guardWrite() {
 
 function setLockedState(locked) {
   subscriptionValid = !locked;
-  document.getElementById("lockBanner").classList.toggle("hidden", !locked);
+  const banner = document.getElementById("lockBanner");
+  banner.classList.toggle("hidden", !locked);
+  if (locked && userRole === "driver") {
+    banner.textContent = "🔒 המנוי של המפיץ הסתיים - הגישה של העובדים נחסמה עד שהמפיץ יחדש את המנוי.";
+  }
+  document.body.classList.toggle("sub-locked", locked);
 }
+
+// אחרי סוף הניסיון/המנוי: צפייה ביתרות בלבד. הפיצ'רים האלה נעולים עד שדרוג.
+const PAID_FEATURES = {
+  toggleReportsBtn: "הדוחות והמגמות",
+  toggleAlertsBtn: "התראות הוואטסאפ",
+  toggleDriversBtn: "ניהול העובדים",
+  toggleAiBtn: "עוזר ה-AI"
+};
+document.addEventListener("click", (e) => {
+  if (subscriptionValid) return;
+  const btn = e.target.closest && e.target.closest("button[id]");
+  const feature = btn && PAID_FEATURES[btn.id];
+  if (!feature) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  if (userRole === "driver") {
+    alert("המנוי של המפיץ הסתיים - לא ניתן להשתמש באפשרות הזו כרגע.");
+    return;
+  }
+  if (typeof closeSheets === "function") closeSheets();
+  document.getElementById("paymentFeedback").textContent = `🔒 ${feature} - האפשרות זמינה במנוי פעיל בלבד. תקופת הניסיון הסתיימה - שדרג כדי לפתוח את כל האפשרויות.`;
+  document.getElementById("paymentModal").classList.remove("hidden");
+}, true);
 
 let activeRules = {
   refillDay: String(new Date().getDay()),
@@ -998,6 +1026,11 @@ function bindUserListeners(uid) {
       .map((d) => ({ ...d.data(), id: d.id }))
       .sort((a, b) => Number(a.order ?? 9999) - Number(b.order ?? 9999));
     updateStatsAndList(currentTerminals);
+  }, (err) => {
+    if (err && err.code === "permission-denied" && userRole === "driver") {
+      document.getElementById("terminalsList").innerHTML =
+        '<div class="status-note" style="padding:16px;text-align:center;">🔒 המנוי של המפיץ הסתיים.<br>הגישה תחזור אוטומטית אחרי שהמפיץ יחדש את המנוי (רענן את הדף).</div>';
+    }
   });
 }
 

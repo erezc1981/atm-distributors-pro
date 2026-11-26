@@ -216,6 +216,7 @@
     .ai-soon { margin-top: 10px; padding: 14px; border-radius: 14px; background: linear-gradient(135deg, #eff6ff, #f5f3ff); border: 1px solid #c7d2fe; text-align: center; }
     .ai-soon b { display: block; font-size: 1.1rem; margin-bottom: 4px; }
     .ai-examples.soon button { opacity: 0.75; cursor: default; }
+    body.sub-locked .paid-only::after { content: "🔒"; margin-inline-start: auto; font-size: 0.85rem; }
     .chip-offline { background: #fef2f2; color: #b91c1c; border-color: #fecaca; font-weight: 700; }
 
     /* כרטיס סיכום */
@@ -701,7 +702,7 @@
         <button type="button" class="menu-btn" data-open-sheet="moreSheet" aria-label="תפריט">☰<span class="desk-only"> תפריט</span></button>
       </div>
     </header>
-    <div id="lockBanner" class="alert-banner hidden" style="background:#92400e;">🔒 תקופת הניסיון/המנוי הסתיימה — הנתונים מוצגים לקריאה בלבד. לחץ "שדרוג / תשלום" כדי להמשיך.</div>
+    <div id="lockBanner" class="alert-banner hidden" style="background:#92400e;">🔒 תקופת הניסיון/המנוי הסתיימה — אפשר לראות יתרות בלבד. דוחות, התראות, עובדים ועוזר AI נעולים עד השדרוג. לחץ "שדרוג / תשלום" כדי להמשיך.</div>
     <div id="alertBanner" class="alert-banner hidden"></div>
     <div id="offlineBanner" class="alert-banner hidden" style="background:#475569;">📴 אין חיבור לאינטרנט — אפשר להמשיך לעבוד, השינויים יישמרו כשהחיבור יחזור.</div>
     <div id="verifyBanner" class="alert-banner hidden" style="background:#1d4ed8;">
@@ -728,11 +729,11 @@
       <nav class="menu-list">
         <button id="toggleRouteBtn" type="button" class="menu-item owner-only">📅 <span>ימי קו לחלוקה</span></button>
         <button id="toggleCasBtn" type="button" class="menu-item owner-only">🏦 <span>חיבור לכספונט</span></button>
-        <button id="toggleAlertsBtn" type="button" class="menu-item owner-only">🔔 <span>התראות וואטסאפ</span></button>
-        <button id="toggleDriversBtn" type="button" class="menu-item owner-only">👥 <span>עובדים</span></button>
+        <button id="toggleAlertsBtn" type="button" class="menu-item owner-only paid-only">🔔 <span>התראות וואטסאפ</span></button>
+        <button id="toggleDriversBtn" type="button" class="menu-item owner-only paid-only">👥 <span>עובדים</span></button>
         <button id="toggleReferralBtn" type="button" class="menu-item owner-only">🎁 <span>חבר מביא חבר</span></button>
         <button id="openPayModalBtn" type="button" class="menu-item owner-only">💳 <span>שדרוג / תשלום</span></button>
-        <button id="toggleAiBtn" type="button" class="menu-item">🤖 <span>עוזר AI - שאל על הנתונים</span><span class="soon-badge ai-soon-only">בקרוב</span></button>
+        <button id="toggleAiBtn" type="button" class="menu-item paid-only">🤖 <span>עוזר AI - שאל על הנתונים</span><span class="soon-badge ai-soon-only">בקרוב</span></button>
         <button id="toggleFaultsBtn" type="button" class="menu-item">🛠️ <span>קודי תקלות</span></button>
         <a id="adminLink" href="admin.html" class="menu-item hidden">⚙️ <span>ניהול מנויים</span></a>
         <a href="terms.html" target="_blank" rel="noopener" class="menu-item">📄 <span>תנאי שימוש ופרטיות</span></a>
