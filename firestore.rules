@@ -138,6 +138,19 @@ service cloud.firestore {
           && (!('locationAt' in d) || d.locationAt == null || d.locationAt is int);
       }
 
+      // תמונה של מקום המסוף (JPEG דחוס כ-data URL). מפיץ ועובד פעיל יכולים לצלם/למחוק
+      match /photos/{tid} {
+        allow read: if ownerOrActiveDriver(uid);
+        allow create, update: if hasValidSub(uid) && ownerOrDriver(uid)
+          && request.resource.data.keys().hasOnly(['data', 'updatedAt', 'byUid'])
+          && request.resource.data.data is string
+          && request.resource.data.data.size() <= 300000
+          && request.resource.data.data.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$')
+          && request.resource.data.updatedAt is int
+          && request.resource.data.byUid == request.auth.uid;
+        allow delete: if hasValidSub(uid) && ownerOrDriver(uid);
+      }
+
       match /terminals/{tid} {
         allow read: if ownerOrActiveDriver(uid);
         // מסופים נוצרים ע"י הסנכרון בלבד
@@ -148,10 +161,11 @@ service cloud.firestore {
             && changedKeys().hasOnly([
                  'sector', 'paperRollNeeded', 'threshold', 'notes', 'baseTargetK',
                  'refilled', 'lastRefilledAt', 'lastRefillId', 'hidden', 'order',
-                 'address', 'lat', 'lng', 'locationAt'
+                 'address', 'lat', 'lng', 'locationAt', 'photoAt'
                ])
             && validNotes(request.resource.data)
             && validLocation(request.resource.data)
+            && (!('photoAt' in changedKeys()) || request.resource.data.photoAt == null || request.resource.data.photoAt is int)
             && (!('threshold' in changedKeys()) || (request.resource.data.threshold is number && request.resource.data.threshold >= 0))
             && (!('baseTargetK' in changedKeys()) || request.resource.data.baseTargetK == null
                 || (request.resource.data.baseTargetK is number && request.resource.data.baseTargetK >= 0 && request.resource.data.baseTargetK <= 1000))
@@ -160,9 +174,10 @@ service cloud.firestore {
             && (!('order' in changedKeys()) || (request.resource.data.order is int && request.resource.data.order >= 0 && request.resource.data.order <= 10000)))
           || (isDriverOf(uid)
             && changedKeys().hasOnly(['paperRollNeeded', 'notes', 'refilled', 'lastRefilledAt', 'lastRefillId',
-                                      'address', 'lat', 'lng', 'locationAt'])
+                                      'address', 'lat', 'lng', 'locationAt', 'photoAt'])
             && validNotes(request.resource.data)
-            && validLocation(request.resource.data))
+            && validLocation(request.resource.data)
+            && (!('photoAt' in changedKeys()) || request.resource.data.photoAt == null || request.resource.data.photoAt is int))
         );
       }
 

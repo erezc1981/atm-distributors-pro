@@ -660,7 +660,7 @@ function renderTerminalCard(t, index) {
       <div class="tc-more">
         <button type="button" data-act="togglePaperRoll" data-id="${safeIdAttr}">🧻 ${paperNeeded ? "בטל סימון נייר" : "נגמר נייר"}</button>
         <button type="button" data-act="editTerminalNote" data-id="${safeIdAttr}">📝 ${noteText ? "ערוך הערה" : "הוסף הערה"}</button>
-        <button type="button" data-act="editLocation" data-id="${safeIdAttr}">📍 ${hasLocation(t) ? "עדכן מיקום" : "הוסף מיקום"}</button>
+        <button type="button" data-act="editLocation" data-id="${safeIdAttr}">📍 ${hasLocation(t) ? "עדכן מיקום" : "הוסף מיקום"}${t.photoAt ? " · 📷" : " / תמונה"}</button>
         <button type="button" class="owner-only" data-act="openEditTargetModal" data-id="${safeIdAttr}">🎯 יעד מילוי</button>
         <button type="button" class="owner-only" data-act="editTerminalThreshold" data-id="${safeIdAttr}">🔔 סף התראה</button>
         <button type="button" class="owner-only" data-act="moveTerminal" data-id="${safeIdAttr}" data-arg="-1">▲ הזז למעלה</button>
@@ -1809,6 +1809,7 @@ window.navTerminal = function (id) {
   navTerminalId = id;
   const where = Number.isFinite(t.lat) ? "מיקום מדויק" : String(t.address);
   document.getElementById("navTarget").textContent = `${t.name || id} · ${where}`;
+  showPlacePhoto(id, "navPhoto");
   openSheet("navPanel");
 };
 function openNav(app) {
@@ -1839,6 +1840,7 @@ window.editLocation = function (id) {
   document.getElementById("locTerminalName").textContent = `${t.name || id} (מזהה ${id})`;
   document.getElementById("locAddressInput").value = locDraft.address;
   renderLocCoords();
+  showPlacePhoto(id, "locPhoto");
   openSheet("locationPanel");
 };
 document.getElementById("locHereBtn").addEventListener("click", () => {
@@ -1880,6 +1882,121 @@ document.getElementById("locSaveBtn").addEventListener("click", () => {
 document.getElementById("locClearBtn").addEventListener("click", () => {
   if (!confirm("למחוק את המיקום של המסוף?")) return;
   saveLocation({ address: null, lat: null, lng: null, locationAt: Date.now() });
+});
+
+// ---------- תמונה של מקום המסוף ----------
+// נשמרת דחוסה (JPEG ~1024px) במסמך נפרד, כדי שרשימת המסופים לא תיטען כבדה
+const PHOTO_MAX_SIDE = 1024;
+const PHOTO_MAX_CHARS = 300000;
+const photoCache = new Map(); // tid -> dataUrl | null
+
+function photoRef(tid) {
+  return db.collection("distributors").doc(dataUid).collection("photos").doc(String(tid));
+}
+async function loadPlacePhoto(tid) {
+  if (photoCache.has(tid)) return photoCache.get(tid);
+  const t = currentTerminals.find((x) => x.id === tid);
+  if (!t || !t.photoAt) return null;
+  try {
+    const snap = await photoRef(tid).get();
+    const data = snap.exists ? String(snap.data().data || "") : "";
+    const url = data.startsWith("data:image/jpeg;base64,") ? data : null;
+    photoCache.set(tid, url);
+    return url;
+  } catch (err) {
+    console.warn("photo load:", err && err.message);
+    return null;
+  }
+}
+async function showPlacePhoto(tid, imgId) {
+  const img = document.getElementById(imgId);
+  img.classList.add("hidden");
+  img.classList.remove("zoomed");
+  img.removeAttribute("src");
+  if (imgId === "locPhoto") renderPhotoControls(false);
+  const url = await loadPlacePhoto(tid);
+  if (navTerminalId !== tid) return; // נפתח מסוף אחר בינתיים
+  if (url) {
+    img.src = url;
+    img.classList.remove("hidden");
+  }
+  if (imgId === "locPhoto") renderPhotoControls(Boolean(url));
+}
+function renderPhotoControls(hasPhoto) {
+  document.getElementById("locPhotoBtnText").textContent = hasPhoto ? "החלף תמונה" : "צלם תמונה";
+  document.getElementById("locPhotoDeleteBtn").classList.toggle("hidden", !hasPhoto);
+  document.getElementById("locPhotoStatus").textContent = "";
+}
+for (const id of ["locPhoto", "navPhoto"]) {
+  document.getElementById(id).addEventListener("click", (e) => e.currentTarget.classList.toggle("zoomed"));
+}
+
+function compressPhoto(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader(); // data: מותר ב-CSP (blob: לא)
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, PHOTO_MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.naturalWidth * scale);
+      canvas.height = Math.round(img.naturalHeight * scale);
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      let quality = 0.72;
+      let data = canvas.toDataURL("image/jpeg", quality);
+      while (data.length > PHOTO_MAX_CHARS && quality > 0.3) {
+        quality -= 0.12;
+        data = canvas.toDataURL("image/jpeg", quality);
+      }
+      if (data.length > PHOTO_MAX_CHARS) reject(new Error("התמונה גדולה מדי"));
+      else resolve(data);
+    };
+    img.onerror = () => reject(new Error("לא ניתן לקרוא את התמונה"));
+    reader.onload = () => { img.src = reader.result; };
+    reader.onerror = () => reject(new Error("לא ניתן לקרוא את הקובץ"));
+    reader.readAsDataURL(file);
+  });
+}
+
+document.getElementById("locPhotoInput").addEventListener("change", async (e) => {
+  const input = e.currentTarget;
+  const file = input.files && input.files[0];
+  input.value = "";
+  if (!file || !navTerminalId || !guardWrite()) return;
+  const tid = navTerminalId;
+  const status = document.getElementById("locPhotoStatus");
+  status.textContent = "מכין ושומר את התמונה...";
+  try {
+    const data = await compressPhoto(file);
+    const now = Date.now();
+    const batch = db.batch();
+    batch.set(photoRef(tid), { data, updatedAt: now, byUid: currentUser.uid });
+    batch.update(db.collection("distributors").doc(dataUid).collection("terminals").doc(tid), { photoAt: now });
+    await batch.commit();
+    photoCache.set(tid, data);
+    const img = document.getElementById("locPhoto");
+    img.src = data;
+    img.classList.remove("hidden");
+    renderPhotoControls(true);
+    showToast("התמונה נשמרה ✓");
+  } catch (err) {
+    status.textContent = "שמירת התמונה נכשלה: " + errorHe(err, err && err.message);
+  }
+});
+document.getElementById("locPhotoDeleteBtn").addEventListener("click", async () => {
+  if (!navTerminalId || !guardWrite() || !confirm("למחוק את התמונה של המסוף?")) return;
+  const tid = navTerminalId;
+  try {
+    const batch = db.batch();
+    batch.delete(photoRef(tid));
+    batch.update(db.collection("distributors").doc(dataUid).collection("terminals").doc(tid), { photoAt: null });
+    await batch.commit();
+    photoCache.set(tid, null);
+    document.getElementById("locPhoto").classList.add("hidden");
+    renderPhotoControls(false);
+    showToast("התמונה נמחקה");
+  } catch (err) {
+    document.getElementById("locPhotoStatus").textContent = "המחיקה נכשלה: " + errorHe(err, err && err.message);
+  }
 });
 
 // ---------- חבר מביא חבר ----------
