@@ -155,7 +155,7 @@ service cloud.firestore {
             && (!('threshold' in changedKeys()) || (request.resource.data.threshold is number && request.resource.data.threshold >= 0))
             && (!('baseTargetK' in changedKeys()) || request.resource.data.baseTargetK == null
                 || (request.resource.data.baseTargetK is number && request.resource.data.baseTargetK >= 0 && request.resource.data.baseTargetK <= 1000))
-            && (!('sector' in changedKeys()) || request.resource.data.sector in ['jewish', 'arab', 'none'])
+            && (!('sector' in changedKeys()) || request.resource.data.sector in ['jewish', 'haredi', 'arab', 'none'])
             && (!('hidden' in changedKeys()) || request.resource.data.hidden is bool)
             && (!('order' in changedKeys()) || (request.resource.data.order is int && request.resource.data.order >= 0 && request.resource.data.order <= 10000)))
           || (isDriverOf(uid)
