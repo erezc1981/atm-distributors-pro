@@ -1721,7 +1721,7 @@ async function askAi(question) {
     const res = await fetch(AI_URL, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ question, history: aiHistory.slice(-8), context })
+      body: JSON.stringify({ question, distUid: dataUid, history: aiHistory.slice(-8), context })
     });
     const out = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(out.error || "העוזר לא זמין כרגע, נסה שוב.");
