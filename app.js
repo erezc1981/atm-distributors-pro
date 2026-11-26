@@ -1521,6 +1521,36 @@ document.getElementById("inviteDriverBtn").addEventListener("click", async () =>
   }
 });
 
+// ---------- קודי תקלות ----------
+const FAULT_CODES = [
+  [11, "מספר מסוף לא הוגדר"],
+  [12, "סוג תקשורת לא הוגדר"],
+  [13, "כתובת שרת / טלפון לא הוגדר"],
+  [14, "ערך שטר לא הוגדר"],
+  [15, "לא בוצעה תקשורת ראשונה / התקנה"],
+  [20, "מסוף ללא תחילת יום"],
+  [21, "לא קיים מפתח הצפנה"],
+  [31, "מחסנית לא מחוברת"],
+  [32, "דלת פתוחה"],
+  [41, "תקלת מחסנית (שטר תקוע וכו')"],
+  [43, "שלוש עסקאות חלקיות ברצף (חובה להעביר שטר למגירת הדחויים)"],
+  [51, "תקלת תקשורת"],
+  [61, "הצפנה (נפילת תקשורת במהלך עסקה)"]
+];
+function renderFaults() {
+  const q = document.getElementById("faultSearchInput").value.trim();
+  const rows = FAULT_CODES.filter(([code, text]) => !q || String(code).startsWith(q) || text.includes(q));
+  document.getElementById("faultRows").innerHTML = rows
+    .map(([code, text]) => `<tr><td class="fault-code">${code}</td><td>${escapeHtml(text)}</td></tr>`).join("");
+  document.getElementById("faultEmpty").classList.toggle("hidden", rows.length > 0);
+}
+document.getElementById("toggleFaultsBtn").addEventListener("click", () => {
+  document.getElementById("faultSearchInput").value = "";
+  renderFaults();
+  toggleSheet("faultsPanel");
+});
+document.getElementById("faultSearchInput").addEventListener("input", renderFaults);
+
 // ---------- מיקום וניווט למסוף ----------
 function hasLocation(t) {
   return Boolean(t && ((Number.isFinite(t.lat) && Number.isFinite(t.lng)) || String(t.address || "").trim()));
