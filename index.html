@@ -212,6 +212,10 @@
     .ai-examples button { font-size: 0.82rem; padding: 6px 10px; border-radius: 999px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a; }
     .ai-form { display: flex; gap: 6px; margin-top: 10px; align-items: flex-end; }
     .ai-form textarea { flex: 1; min-height: 44px; max-height: 120px; resize: vertical; font: inherit; padding: 10px; border-radius: 12px; border: 1px solid var(--border); }
+    .soon-badge { display: inline-block; font-size: 0.68rem; font-weight: 800; background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; border-radius: 999px; padding: 1px 7px; margin-inline-start: 6px; vertical-align: middle; }
+    .ai-soon { margin-top: 10px; padding: 14px; border-radius: 14px; background: linear-gradient(135deg, #eff6ff, #f5f3ff); border: 1px solid #c7d2fe; text-align: center; }
+    .ai-soon b { display: block; font-size: 1.1rem; margin-bottom: 4px; }
+    .ai-examples.soon button { opacity: 0.75; cursor: default; }
     .chip-offline { background: #fef2f2; color: #b91c1c; border-color: #fecaca; font-weight: 700; }
 
     /* כרטיס סיכום */
@@ -728,7 +732,7 @@
         <button id="toggleDriversBtn" type="button" class="menu-item owner-only">👥 <span>עובדים</span></button>
         <button id="toggleReferralBtn" type="button" class="menu-item owner-only">🎁 <span>חבר מביא חבר</span></button>
         <button id="openPayModalBtn" type="button" class="menu-item owner-only">💳 <span>שדרוג / תשלום</span></button>
-        <button id="toggleAiBtn" type="button" class="menu-item">🤖 <span>עוזר AI - שאל על הנתונים</span></button>
+        <button id="toggleAiBtn" type="button" class="menu-item">🤖 <span>עוזר AI - שאל על הנתונים</span><span class="soon-badge ai-soon-only">בקרוב</span></button>
         <button id="toggleFaultsBtn" type="button" class="menu-item">🛠️ <span>קודי תקלות</span></button>
         <a id="adminLink" href="admin.html" class="menu-item hidden">⚙️ <span>ניהול מנויים</span></a>
         <a href="terms.html" target="_blank" rel="noopener" class="menu-item">📄 <span>תנאי שימוש ופרטיות</span></a>
@@ -780,8 +784,13 @@
 
       <!-- עוזר AI -->
       <section id="aiPanel" class="panel sheet hidden" role="dialog" aria-modal="true" aria-labelledby="aiTitle">
-        <div class="sheet-head"><strong id="aiTitle">🤖 עוזר AI</strong><button type="button" class="sheet-close" data-close-sheet aria-label="סגור">✕</button></div>
+        <div class="sheet-head"><strong id="aiTitle">🤖 עוזר AI <span class="soon-badge ai-soon-only">בקרוב</span></strong><button type="button" class="sheet-close" data-close-sheet aria-label="סגור">✕</button></div>
         <p class="status-note" style="margin:6px 0 0;">שאל שאלות על המסופים, העסקאות, המשיכות, ההטענות וקודי התקלות. התשובות מבוססות על הנתונים שלך ועלולות לטעות - בדוק לפני החלטה.</p>
+        <div id="aiSoon" class="ai-soon hidden">
+          <b>✨ בקרוב: עוזר חכם לקו שלך</b>
+          תוכל לשאול בשפה חופשית על המסופים שלך ולקבל תשובה מיידית על בסיס הנתונים - ממוצעי עסקאות ומשיכות, כמה כסף להכין לביקור הבא, אילו מסופים יתרוקנו ראשונים, ומה לעשות בכל קוד תקלה.
+          <div class="status-note" style="margin-top:6px;">כך זה ייראה - דוגמאות לשאלות:</div>
+        </div>
         <div id="aiExamples" class="ai-examples">
           <button type="button">מה הממוצע עסקאות ליום במסוף </button>
           <button type="button">כמה כסף להכין לביקור הבא בקו?</button>

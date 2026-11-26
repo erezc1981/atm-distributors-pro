@@ -1553,6 +1553,17 @@ document.getElementById("faultSearchInput").addEventListener("input", renderFaul
 
 // ---------- עוזר AI ----------
 const AI_URL = SYNC_RELAY_URL + "/ask";
+const AI_ENABLED = false; // להפעיל אחרי חיבור מפתח ה-API בשרת (ANTHROPIC_API_KEY ב-Cloudflare)
+(function setupAiMode() {
+  document.querySelectorAll(".ai-soon-only").forEach((el) => el.classList.toggle("hidden", AI_ENABLED));
+  document.getElementById("aiSoon").classList.toggle("hidden", AI_ENABLED);
+  document.getElementById("aiExamples").classList.toggle("soon", !AI_ENABLED);
+  if (!AI_ENABLED) {
+    document.getElementById("aiForm").classList.add("hidden");
+    document.getElementById("aiClearBtn").classList.add("hidden");
+    document.querySelector("#aiPanel > p.status-note").classList.add("hidden");
+  }
+})();
 let aiHistory = []; // [{role, content}]
 let aiBusy = false;
 let aiDailyCache = { at: 0, uid: null, days: [], refills: [] };
@@ -1663,6 +1674,7 @@ function aiAppend(role, text, isErr) {
 
 async function askAi(question) {
   question = String(question || "").trim().slice(0, 600);
+  if (!AI_ENABLED) { showToast("העוזר החכם יופעל בקרוב ✨"); return; }
   if (!question || aiBusy || !currentUser || !dataUid) return;
   aiBusy = true;
   const sendBtn = document.getElementById("aiSendBtn");
@@ -1693,7 +1705,7 @@ async function askAi(question) {
 
 document.getElementById("toggleAiBtn").addEventListener("click", () => {
   toggleSheet("aiPanel");
-  setTimeout(() => document.getElementById("aiInput").focus(), 50);
+  if (AI_ENABLED) setTimeout(() => document.getElementById("aiInput").focus(), 50);
 });
 document.getElementById("aiForm").addEventListener("submit", (e) => {
   e.preventDefault();
@@ -1712,6 +1724,7 @@ document.getElementById("aiExamples").addEventListener("click", (e) => {
   const b = e.target.closest("button");
   if (!b) return;
   const text = b.textContent;
+  if (!AI_ENABLED) { showToast("העוזר החכם יופעל בקרוב ✨"); return; }
   if (text.endsWith(" ")) { // שאלה שצריך להשלים (שם מסוף)
     const input = document.getElementById("aiInput");
     input.value = text;
