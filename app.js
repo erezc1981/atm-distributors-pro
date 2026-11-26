@@ -1551,6 +1551,194 @@ document.getElementById("toggleFaultsBtn").addEventListener("click", () => {
 });
 document.getElementById("faultSearchInput").addEventListener("input", renderFaults);
 
+// ---------- עוזר AI ----------
+const AI_URL = SYNC_RELAY_URL + "/ask";
+const AI_ENABLED = false; // להפעיל אחרי חיבור מפתח ה-API בשרת (ANTHROPIC_API_KEY ב-Cloudflare)
+(function setupAiMode() {
+  document.querySelectorAll(".ai-soon-only").forEach((el) => el.classList.toggle("hidden", AI_ENABLED));
+  document.getElementById("aiSoon").classList.toggle("hidden", AI_ENABLED);
+  document.getElementById("aiExamples").classList.toggle("soon", !AI_ENABLED);
+  if (!AI_ENABLED) {
+    document.getElementById("aiForm").classList.add("hidden");
+    document.getElementById("aiClearBtn").classList.add("hidden");
+    document.querySelector("#aiPanel > p.status-note").classList.add("hidden");
+  }
+})();
+let aiHistory = []; // [{role, content}]
+let aiBusy = false;
+let aiDailyCache = { at: 0, uid: null, days: [], refills: [] };
+
+async function loadAiHistoryData() {
+  if (aiDailyCache.uid === dataUid && Date.now() - aiDailyCache.at < 10 * 60 * 1000) return aiDailyCache;
+  const distRef = db.collection("distributors").doc(dataUid);
+  const since = new Date();
+  since.setDate(since.getDate() - 28);
+  const [daily, refills] = await Promise.all([
+    distRef.collection("daily").where("date", ">=", localIsoDate(since)).orderBy("date").get()
+      .then((s) => s.docs.map((d) => d.data())).catch(() => []),
+    distRef.collection("refills").orderBy("at", "desc").limit(25).get()
+      .then((s) => s.docs.map((d) => d.data())).catch(() => [])
+  ]);
+  aiDailyCache = { at: Date.now(), uid: dataUid, days: daily, refills };
+  return aiDailyCache;
+}
+
+// שם המסוף מופיע בשאלה? (התאמה גסה, בלי ה' / אל בהתחלה)
+function aiMentions(question, name) {
+  const norm = (x) => String(x || "").toLowerCase().replace(/["'׳״\-]/g, " ");
+  const q = norm(question);
+  return norm(name).split(/\s+/).filter((w) => w.length >= 3).some((w) => {
+    const core = w.replace(/^(אל|ה)/, "");
+    return q.includes(w) || (core.length >= 3 && q.includes(core));
+  });
+}
+
+function aiNextVisits() {
+  const days = [...new Set(routeDays)].sort((a, b) => a - b);
+  const out = [];
+  const d = new Date();
+  for (let i = 0; i <= 14 && out.length < 3; i++) {
+    const x = new Date(d.getFullYear(), d.getMonth(), d.getDate() + i);
+    if (days.includes(x.getDay())) out.push(`${localIsoDate(x)} (${DAYS[x.getDay()]})`);
+  }
+  return out;
+}
+
+async function buildAiContext(question) {
+  const { days, refills } = await loadAiHistoryData();
+  const today = localIsoDate(new Date());
+  const full = days.filter((d) => d.date < today);
+  const visible = currentTerminals.filter((t) => !t.hidden);
+  const val = (d, tid, f) => Number(((d.terminals || {})[tid] || {})[f] || 0);
+  const avg = (arr, tid, f) => arr.length ? Math.round(arr.reduce((s, d) => s + val(d, tid, f), 0) / arr.length) : null;
+  const mentioned = visible.filter((t) => aiMentions(question, t.name));
+  const rawFor = new Set((visible.length <= 30 ? visible : mentioned).map((t) => String(t.id)));
+
+  const stats = {};
+  const daily = {};
+  for (const t of visible) {
+    const tid = String(t.id);
+    const last7 = full.slice(-7);
+    const byWeekday = {};
+    for (let w = 0; w < 7; w++) {
+      const same = full.filter((d) => new Date(d.date + "T12:00:00").getDay() === w);
+      if (same.length) byWeekday[DAYS[w]] = { avgWithdrawn: avg(same, tid, "withdrawn"), avgTx: avg(same, tid, "tx"), n: same.length };
+    }
+    stats[tid] = {
+      days: full.length,
+      avgTx7: avg(last7, tid, "tx"), avgWithdrawn7: avg(last7, tid, "withdrawn"),
+      avgTx28: avg(full, tid, "tx"), avgWithdrawn28: avg(full, tid, "withdrawn"),
+      byWeekday
+    };
+  }
+  for (const d of days) {
+    const row = {};
+    for (const tid of rawFor) {
+      const e = (d.terminals || {})[tid];
+      if (e) row[tid] = { tx: e.tx || 0, withdrawn: e.withdrawn || 0, loadedEst: e.loadedEst || 0, lastBalance: e.lastBalance ?? null };
+    }
+    if (Object.keys(row).length) daily[d.date + (d.date === today ? " (היום, חלקי)" : "")] = row;
+  }
+  const iso = (ms) => (Number(ms) ? new Date(Number(ms)).toLocaleString("he-IL") : null);
+  const now = new Date();
+  return {
+    now: `${now.toLocaleString("he-IL")} יום ${DAYS[now.getDay()]}`,
+    terminals: visible.map((t) => ({
+      id: String(t.id), name: t.name || "", balance: Number(t.balance) || 0,
+      txToday: Number(t.txSinceMidnight) || 0,
+      lastTxAt: iso(t.lastTxAt), lastCommAt: iso(t.lastCommAt),
+      targetK: hasConfiguredTargetK(t) ? Number(t.baseTargetK) : null,
+      sector: t.sector || null, address: t.address || null,
+      note: String(t.notes || "").slice(0, 200) || null
+    })),
+    stats,
+    daily,
+    dailyNote: rawFor.size < visible.length ? "daily כולל רק מסופים שהוזכרו בשאלה; לשאר יש stats" : undefined,
+    routeDays: [...new Set(routeDays)].sort().map((d) => `${d} (${DAYS[d]})`),
+    nextVisits: aiNextVisits(),
+    rules: activeRules,
+    refills: refills.map((r) => ({ terminal: r.terminalName, amount: r.amount, balanceBefore: r.balanceBefore, at: iso(r.at), by: r.byName || undefined })),
+    faultCodes: FAULT_CODES.map(([code, text]) => ({ code, text }))
+  };
+}
+
+function aiAppend(role, text, isErr) {
+  const log = document.getElementById("aiLog");
+  const div = document.createElement("div");
+  div.className = "ai-msg " + (role === "user" ? "ai-user" : "ai-bot") + (isErr ? " ai-err" : "");
+  div.textContent = text;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  return div;
+}
+
+async function askAi(question) {
+  question = String(question || "").trim().slice(0, 600);
+  if (!AI_ENABLED) { showToast("העוזר החכם יופעל בקרוב ✨"); return; }
+  if (!question || aiBusy || !currentUser || !dataUid) return;
+  aiBusy = true;
+  const sendBtn = document.getElementById("aiSendBtn");
+  sendBtn.disabled = true;
+  document.getElementById("aiExamples").classList.add("hidden");
+  aiAppend("user", question);
+  const pending = aiAppend("assistant", "חושב... 🤔");
+  try {
+    const context = await buildAiContext(question);
+    const token = await currentUser.getIdToken();
+    const res = await fetch(AI_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ question, history: aiHistory.slice(-8), context })
+    });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(out.error || "העוזר לא זמין כרגע, נסה שוב.");
+    pending.textContent = out.answer;
+    aiHistory.push({ role: "user", content: question }, { role: "assistant", content: out.answer });
+  } catch (err) {
+    pending.classList.add("ai-err");
+    pending.textContent = navigator.onLine === false ? "אין חיבור לאינטרנט." : (err && err.message) || "העוזר לא זמין כרגע.";
+  } finally {
+    aiBusy = false;
+    sendBtn.disabled = false;
+  }
+}
+
+document.getElementById("toggleAiBtn").addEventListener("click", () => {
+  toggleSheet("aiPanel");
+  if (AI_ENABLED) setTimeout(() => document.getElementById("aiInput").focus(), 50);
+});
+document.getElementById("aiForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const input = document.getElementById("aiInput");
+  const q = input.value;
+  input.value = "";
+  askAi(q);
+});
+document.getElementById("aiInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    document.getElementById("aiForm").requestSubmit();
+  }
+});
+document.getElementById("aiExamples").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  const text = b.textContent;
+  if (!AI_ENABLED) { showToast("העוזר החכם יופעל בקרוב ✨"); return; }
+  if (text.endsWith(" ")) { // שאלה שצריך להשלים (שם מסוף)
+    const input = document.getElementById("aiInput");
+    input.value = text;
+    input.focus();
+    return;
+  }
+  askAi(text);
+});
+document.getElementById("aiClearBtn").addEventListener("click", () => {
+  aiHistory = [];
+  document.getElementById("aiLog").innerHTML = "";
+  document.getElementById("aiExamples").classList.remove("hidden");
+});
+
 // ---------- מיקום וניווט למסוף ----------
 function hasLocation(t) {
   return Boolean(t && ((Number.isFinite(t.lat) && Number.isFinite(t.lng)) || String(t.address || "").trim()));
