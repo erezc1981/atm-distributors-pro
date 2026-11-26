@@ -250,6 +250,7 @@ function getTerminalThreshold(t) {
 
 function getTerminalSector(t) {
   if (t.sector === "arab") return "arab";
+  if (t.sector === "haredi") return "haredi";
   if (t.sector === "none") return "none";
   return "jewish";
 }
@@ -270,7 +271,7 @@ function getEffectiveTargetK(t) {
   const sector = getTerminalSector(t);
   const sectorPct = sector === "arab"
     ? Number(ADJUSTMENTS.arabMode?.[activeRules.arabMode] ?? 0)
-    : sector === "jewish"
+    : sector === "jewish" || sector === "haredi"
       ? Number(ADJUSTMENTS.jewishMode?.[activeRules.jewishMode] ?? 0)
       : 0;
 
@@ -342,11 +343,36 @@ const HOLIDAY_CALENDAR = {
     "2027-06-10": "eve_holiday", "2027-06-11": "holiday",
     "2027-10-01": "eve_holiday", "2027-10-02": "holiday", "2027-10-03": "holiday",
     "2027-10-10": "eve_holiday", "2027-10-11": "holiday",
-    "2027-10-15": "eve_holiday", "2027-10-16": "holiday", "2027-10-22": "eve_holiday", "2027-10-23": "holiday"
+    "2027-10-15": "eve_holiday", "2027-10-16": "holiday", "2027-10-22": "eve_holiday", "2027-10-23": "holiday",
+    // 2028
+    "2028-04-10": "eve_holiday", "2028-04-11": "holiday", "2028-04-16": "eve_holiday", "2028-04-17": "holiday",
+    "2028-05-30": "eve_holiday", "2028-05-31": "holiday",
+    "2028-09-20": "eve_holiday", "2028-09-21": "holiday", "2028-09-22": "holiday",
+    "2028-09-29": "eve_holiday", "2028-09-30": "holiday",
+    "2028-10-04": "eve_holiday", "2028-10-05": "holiday", "2028-10-11": "eve_holiday", "2028-10-12": "holiday"
   },
   arabEves: ["2027-03-09", "2027-05-15"],                       // ערב עיד אל-פיטר / עיד אל-אדחא
   ramadan: [["2027-02-08", "2027-03-08"]]                         // טווחי רמדאן
 };
+
+// מגזר חרדי: אין פעילות בשבת ובחג (מערב שבת/חג 14:00 ועד חצות של מוצאי השבת/החג)
+const HAREDI_REST_FROM_HOUR = 14;
+function isRestDate(d) {
+  return d.getDay() === 6 || HOLIDAY_CALENDAR.jewish[localIsoDate(d)] === "holiday";
+}
+function isHarediRestNow(now = new Date()) {
+  if (isRestDate(now)) return true;
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  return now.getHours() >= HAREDI_REST_FROM_HOUR && isRestDate(tomorrow);
+}
+// חצות שבה הסתיימה השבת/החג האחרונים (כדי לא לספור את זמן המנוחה כ"אין תקשורת")
+function lastRestEndMs(now = new Date()) {
+  for (let i = 1; i <= 10; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+    if (isRestDate(d)) return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
+  }
+  return 0;
+}
 
 // תוספת באחוזים נקבעת רק ידנית (לא עולה אוטומטית בחמישי או בחגים)
 function manualExtraPct() {
@@ -561,22 +587,17 @@ function renderTerminalCard(t, index) {
   const isAlert = rawBalance <= thresholdNum;
   const isDone = Boolean(t.refilled);
   const sector = getTerminalSector(t);
-  const sectorLabel = sector === "arab"
-    ? "מגזר ערבי"
-    : sector === "jewish"
-      ? "מגזר יהודי"
-      : "ללא מגזר";
-  const sectorClass = sector === "arab"
-    ? "sector-arab"
-    : sector === "jewish"
-      ? "sector-jewish"
-      : "sector-none";
+  const sectorLabel = { arab: "מגזר ערבי", jewish: "מגזר יהודי", haredi: "מגזר חרדי" }[sector] || "ללא מגזר";
+  const sectorClass = "sector-" + sector;
 
   const paperNeeded = Boolean(t.paperRollNeeded);
   // תקינות מסוף: תקשורת אחרונה מעל 5 שעות, אין עסקאות עד 12:00 (כמו בהתראות הוואטסאפ)
+  // במגזר חרדי: בשבת ובחג אין התראות תקינות, ואחריהם סופרים מסוף השבת/החג
   const lastComm = Number(t.lastCommAt) || 0;
-  const noComm = lastComm > 0 && Date.now() - lastComm > 5 * 3600 * 1000;
-  const noActivity = new Date().getHours() >= 12 && txMidnight === 0;
+  const harediRest = sector === "haredi" && isHarediRestNow();
+  const commFrom = sector === "haredi" ? Math.max(lastComm, lastRestEndMs()) : lastComm;
+  const noComm = !harediRest && lastComm > 0 && Date.now() - commFrom > 5 * 3600 * 1000;
+  const noActivity = !harediRest && new Date().getHours() >= 12 && txMidnight === 0;
   const hhmm = (ms) => new Date(ms).toLocaleString("he-IL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
   const noteText = String(t.notes ?? "").trim();
   const safeNoteText = escapeHtml(noteText);
@@ -667,9 +688,10 @@ function updateStatsAndList(allTerminals) {
   const showHidden = document.getElementById("showHiddenInput").checked;
   const terminals = allTerminals.filter((t) => !t.hidden);
   const listSource = showHidden ? allTerminals : terminals;
-  const jewishTotal = terminals.filter((t) => getTerminalSector(t) === "jewish").length;
+  const harediTotal = terminals.filter((t) => getTerminalSector(t) === "haredi").length;
+  const jewishTotal = terminals.filter((t) => getTerminalSector(t) === "jewish").length + harediTotal;
   const arabTotal = terminals.filter((t) => getTerminalSector(t) === "arab").length;
-  document.getElementById("jewishCountLabel").textContent = `מגזר יהודי (${jewishTotal}):`;
+  document.getElementById("jewishCountLabel").textContent = harediTotal ? `מגזר יהודי + חרדי (${jewishTotal}):` : `מגזר יהודי (${jewishTotal}):`;
   document.getElementById("arabCountLabel").textContent = `מגזר ערבי (${arabTotal}):`;
 
   const q = searchQuery.trim().toLowerCase();
@@ -739,11 +761,8 @@ window.toggleTerminalSector = async function (terminalId) {
   const t = currentTerminals.find((x) => String(x.id) === String(terminalId));
   if (!t) return;
   const currentSector = getTerminalSector(t);
-  const nextSector = currentSector === "jewish"
-    ? "arab"
-    : currentSector === "arab"
-      ? "none"
-      : "jewish";
+  // סבב: יהודי -> חרדי -> ערבי -> ללא מגזר -> יהודי
+  const nextSector = { jewish: "haredi", haredi: "arab", arab: "none" }[currentSector] || "jewish";
   await db
     .collection("distributors")
     .doc(dataUid)
