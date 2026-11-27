@@ -117,11 +117,23 @@ function guardWrite() {
     return false;
   }
   if (!subscriptionValid) {
-    document.getElementById("paymentFeedback").textContent = "תקופת הניסיון הסתיימה - יש לשדרג כדי להמשיך לערוך.";
-    document.getElementById("paymentModal").classList.remove("hidden");
+    openPaymentModal("תקופת הניסיון הסתיימה - יש לשדרג כדי להמשיך לערוך.");
     return false;
   }
   return true;
+}
+
+// פתיחת חלון התשלום תמיד עם המחיר המעודכן לפי מספר המסופים
+function openPaymentModal(message) {
+  if (typeof closeSheets === "function") closeSheets();
+  renderPriceTier();
+  document.getElementById("paymentFeedback").textContent = message || "";
+  const phoneInput = document.getElementById("payerPhoneInput");
+  if (!phoneInput.value) phoneInput.value = document.getElementById("alertPhoneInput").value || "";
+  document.getElementById("paymentModal").classList.remove("hidden");
+}
+function closePaymentModal() {
+  document.getElementById("paymentModal").classList.add("hidden");
 }
 
 function setLockedState(locked) {
@@ -152,9 +164,7 @@ document.addEventListener("click", (e) => {
     alert("המנוי של המפיץ הסתיים - לא ניתן להשתמש באפשרות הזו כרגע.");
     return;
   }
-  if (typeof closeSheets === "function") closeSheets();
-  document.getElementById("paymentFeedback").textContent = `🔒 ${feature} - האפשרות זמינה במנוי פעיל בלבד. תקופת הניסיון הסתיימה - שדרג כדי לפתוח את כל האפשרויות.`;
-  document.getElementById("paymentModal").classList.remove("hidden");
+  openPaymentModal(`🔒 ${feature} - האפשרות זמינה במנוי פעיל בלבד. תקופת הניסיון הסתיימה - שדרג כדי לפתוח את כל האפשרויות.`);
 }, true);
 
 let activeRules = {
@@ -351,8 +361,8 @@ const HOLIDAY_CALENDAR = {
     "2028-09-29": "eve_holiday", "2028-09-30": "holiday",
     "2028-10-04": "eve_holiday", "2028-10-05": "holiday", "2028-10-11": "eve_holiday", "2028-10-12": "holiday"
   },
-  arabEves: ["2027-03-09", "2027-05-15"],                       // ערב עיד אל-פיטר / עיד אל-אדחא
-  ramadan: [["2027-02-08", "2027-03-08"]]                         // טווחי רמדאן
+  arabEves: ["2027-03-09", "2027-05-15", "2028-02-25", "2028-05-04"], // ערב עיד אל-פיטר / עיד אל-אדחא
+  ramadan: [["2027-02-08", "2027-03-08"], ["2028-01-28", "2028-02-24"]] // טווחי רמדאן
 };
 
 // מגזר חרדי: אין פעילות בשבת ובחג (מערב שבת/חג 14:00 ועד חצות של מוצאי השבת/החג)
@@ -712,7 +722,12 @@ function updateStatsAndList(allTerminals) {
 
   const listEl = document.getElementById("terminalsList");
   if (!listed.length) {
-    listEl.innerHTML = `<div class="panel status-note">אין מסופים להצגה. לחץ על "כספונט" או "רענן" כדי לסנכרן מול כספונט.</div>`;
+    const emptyText = q && listSource.length
+      ? "לא נמצאו מסופים שמתאימים לחיפוש."
+      : userRole === "driver"
+        ? "אין מסופים להצגה. לחץ \"רענן\" כדי לטעון את הנתונים."
+        : "אין מסופים להצגה. אם עוד לא חיברת את כספונט - פתח את התפריט (☰) ← \"חיבור לכספונט\". אם כבר חיברת - לחץ \"רענן\".";
+    listEl.innerHTML = `<div class="panel status-note">${escapeHtml(emptyText)}</div>`;
   } else {
     listEl.innerHTML = listed.map((t, idx) => renderTerminalCard(t, idx)).join("");
   }
@@ -801,8 +816,12 @@ window.moveTerminal = async function (terminalId, dir) {
   if (!guardManage()) return;
   const list = [...currentTerminals];
   const idx = list.findIndex((x) => String(x.id) === String(terminalId));
-  const target = idx + dir;
-  if (idx < 0 || target < 0 || target >= list.length) return;
+  if (idx < 0) return;
+  // מדלגים על מסופים מוסתרים שלא מוצגים, כדי שההזזה תיראה ברשימה
+  const showHidden = document.getElementById("showHiddenInput").checked;
+  let target = idx + dir;
+  while (!showHidden && target >= 0 && target < list.length && list[target].hidden) target += dir;
+  if (target < 0 || target >= list.length) return;
   [list[idx], list[target]] = [list[target], list[idx]];
   const batch = db.batch();
   const col = db.collection("distributors").doc(dataUid).collection("terminals");
@@ -1068,15 +1087,15 @@ function renderPriceTier() {
     `מסלול ${tier.name} (${currentTerminals.length} מסופים${range}). המחירים לא כוללים מע"מ.`;
 }
 
-document.getElementById("openPayModalBtn").addEventListener("click", () => {
-  closeSheets();
-  renderPriceTier();
-  document.getElementById("paymentFeedback").textContent = "";
-  document.getElementById("paymentModal").classList.remove("hidden");
-});
+document.getElementById("openPayModalBtn").addEventListener("click", () => openPaymentModal(""));
 
-document.getElementById("closePayModalBtn").addEventListener("click", () => {
-  document.getElementById("paymentModal").classList.add("hidden");
+document.getElementById("closePayModalBtn").addEventListener("click", closePaymentModal);
+// סגירה בלחיצה מחוץ לחלון או במקש Esc
+document.getElementById("paymentModal").addEventListener("click", (e) => {
+  if (e.target.id === "paymentModal") closePaymentModal();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !document.getElementById("paymentModal").classList.contains("hidden")) closePaymentModal();
 });
 
 document.querySelectorAll(".plan-option").forEach((el) => {
@@ -1088,10 +1107,17 @@ document.querySelectorAll(".plan-option").forEach((el) => {
 });
 
 document.getElementById("confirmPaymentBtn").addEventListener("click", async () => {
-  if (!currentUser) return;
-  const phone = document.getElementById("payerPhoneInput").value.trim();
+  if (!currentUser || !dataUid || userRole !== "owner") return;
+  const btn = document.getElementById("confirmPaymentBtn");
+  const phone = document.getElementById("payerPhoneInput").value.replace(/[^\d+]/g, "");
   const feedback = document.getElementById("paymentFeedback");
-  await db.collection("distributors").doc(dataUid).set({
+  if (phone.replace(/\D/g, "").length < 9) {
+    feedback.textContent = "יש להזין מספר טלפון תקין, כדי שנוכל ליצור איתך קשר להשלמת התשלום.";
+    document.getElementById("payerPhoneInput").focus();
+    return;
+  }
+  renderPriceTier();
+  const write = db.collection("distributors").doc(dataUid).set({
     upgradeRequest: {
       planId: selectedPlan.id,
       planLabel: selectedPlan.label,
@@ -1099,7 +1125,23 @@ document.getElementById("confirmPaymentBtn").addEventListener("click", async () 
       requestedAt: Date.now()
     }
   }, { merge: true });
-  feedback.textContent = `בקשת התשלום עבור מסלול ${selectedPlan.label} נרשמה.`;
+  const doneText = `✓ בקשת השדרוג למסלול ${selectedPlan.label} נשלחה. ניצור איתך קשר בטלפון ${phone} להשלמת התשלום, והמנוי יופעל מיד אחריו.`;
+  // בלי קליטה השמירה ממתינה לחיבור - לא משאירים את הכפתור "תקוע"
+  if (navigator.onLine === false) {
+    write.catch((err) => console.warn("upgrade request:", err && err.code));
+    feedback.textContent = "📴 אין חיבור כרגע. הבקשה נשמרה ותישלח אוטומטית כשהחיבור יחזור.";
+    return;
+  }
+  btn.disabled = true;
+  feedback.textContent = "שולח בקשה...";
+  try {
+    await write;
+    feedback.textContent = doneText;
+  } catch (err) {
+    feedback.textContent = "שליחת הבקשה נכשלה: " + errorHe(err, "נסה שוב בעוד רגע.");
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 document.getElementById("searchInput").addEventListener("input", (e) => {
@@ -1169,6 +1211,13 @@ document.getElementById("loginBtn").addEventListener("click", async () => {
   }
 });
 
+// Enter בשדה האימייל או הסיסמה = התחברות
+for (const id of ["emailInput", "passwordInput"]) {
+  document.getElementById(id).addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); document.getElementById("loginBtn").click(); }
+  });
+}
+
 document.getElementById("forgotBtn").addEventListener("click", async () => {
   const errEl = document.getElementById("authError");
   const infoEl = document.getElementById("authInfo");
@@ -1206,9 +1255,16 @@ document.getElementById("registerBtn").addEventListener("click", async () => {
   try {
     const cred = await auth.createUserWithEmailAndPassword(email, pass);
     cred.user.sendEmailVerification().catch(() => {});
-    // עובד שהוזמן לא מקבל חשבון מפיץ - הוא יצורף למפיץ אחרי אימות האימייל
+    // מי שהוזמן כעובד בוחר: להצטרף כעובד (אחרי אימות האימייל) או לפתוח חשבון מפיץ משלו
     const invite = await findInviteFor(cred.user);
-    if (invite) return;
+    if (invite) {
+      const joinAsDriver = confirm(
+        `הוזמנת להצטרף כעובד ע"י ${invite.distributorEmail || "מפיץ"}.\n\n`
+        + `אישור = הצטרפות כעובד (אחרי אימות האימייל).\nביטול = פתיחת חשבון מפיץ עצמאי עם חודש ניסיון.`
+      );
+      if (joinAsDriver) return;
+      await db.collection("invites").doc(invite.id).delete();
+    }
     const now = Date.now();
     await db.collection("distributors").doc(cred.user.uid).set({
       email,
@@ -1300,11 +1356,16 @@ document.getElementById("saveAndSyncCasBtn").addEventListener("click", async () 
     alert("יש להזין שם משתמש של כספונט");
     return;
   }
+  if (!currentUser.emailVerified && currentUser.uid !== ADMIN_UID) {
+    alert("לפני חיבור כספונט יש לאמת את כתובת האימייל שלך: לחץ על הקישור שנשלח אליך, ואז על \"כבר אימתתי\" בפס הכחול בראש המסך.");
+    return;
+  }
   const payload = {
     username,
     syncRequested: false,
     syncRequestedAt: Date.now(),
-    updatedAt: Date.now()
+    updatedAt: Date.now(),
+    lastSyncError: "" // שמירה מחדש מאפסת את שגיאת הסנכרון הקודמת
   };
   if (plainPass) {
     try {
@@ -1317,7 +1378,7 @@ document.getElementById("saveAndSyncCasBtn").addEventListener("click", async () 
   try {
     await db.collection("distributors").doc(dataUid).collection("settings").doc("cas_sync").set(payload, { merge: true });
   } catch (err) {
-    alert("השמירה נכשלה: " + (err && err.message ? err.message : String(err)));
+    alert("השמירה נכשלה: " + errorHe(err, "נסה שוב בעוד רגע."));
     return;
   }
   passInput.value = "";
