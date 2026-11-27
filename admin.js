@@ -153,7 +153,7 @@ function renderCard(r) {
       <div class="actions">
         <button type="button" class="btn-green" data-act="activate" data-plan="monthly">✅ הפעל חודשי (₪${tier.monthly} + מע"מ)</button>
         <button type="button" class="btn-green" data-act="activate" data-plan="yearly">✅ הפעל שנתי (₪${tier.yearly.toLocaleString("he-IL")} + מע"מ)</button>
-        <button type="button" data-act="trial">⏳ הארך ניסיון</button>
+        <button type="button" data-act="trial">⏳ ${p.subscriptionStatus === "active" ? "הארך מנוי" : "הארך ניסיון"}</button>
         ${pending ? `<button type="button" data-act="handled">✔️ סמן בקשה כטופלה</button>` : ""}
         <button type="button" data-act="note">📝 הערה</button>
         <button type="button" data-act="payments">🧾 תשלומים</button>
@@ -200,7 +200,12 @@ async function activate(uid, plan) {
   const r = rows.find((x) => x.uid === uid);
   const p = r.p;
   const now = Date.now();
-  const currentEnd = p.subscriptionStatus === "active" ? Number(p.currentPeriodEnd) || 0 : 0;
+  // המנוי מתחיל בסוף התקופה הנוכחית: מנוי פעיל - בסוף המנוי; באמצע ניסיון - בסוף הניסיון (לא מפסידים ימי ניסיון)
+  const currentEnd = p.subscriptionStatus === "active"
+    ? Number(p.currentPeriodEnd) || 0
+    : p.subscriptionStatus === "trial" || !p.subscriptionStatus
+      ? Number(p.trialEndsAt) || 0
+      : 0;
   const base = Math.max(now, currentEnd);
   const tier = tierFor(r.cas && r.cas.lastSyncCount);
   // חבר מביא חבר: בתשלום הראשון של מפיץ שהוזמן - חודש מתנה לו ולממליץ
@@ -258,12 +263,20 @@ function addReferrerGift(batch, referral, friendLabel, now) {
 
 async function extendTrial(uid) {
   const r = rows.find((x) => x.uid === uid);
-  const input = prompt(`בכמה ימים להאריך את הניסיון של ${r.p.email || uid}?`, "7");
+  // מפיץ עם מנוי בתשלום: מאריכים את המנוי עצמו (לא מחזירים אותו לניסיון)
+  const isPaid = r.p.subscriptionStatus === "active";
+  const input = prompt(`בכמה ימים להאריך את ${isPaid ? "המנוי" : "הניסיון"} של ${r.p.email || uid}?`, "7");
   if (input === null) return;
   const days = Number(input);
   if (!Number.isInteger(days) || days <= 0 || days > 365) { alert("מספר ימים לא תקין"); return; }
+  const ref = db.collection("distributors").doc(uid);
+  if (isPaid) {
+    const base = Math.max(Date.now(), Number(r.p.currentPeriodEnd) || 0);
+    await ref.update({ currentPeriodEnd: base + days * DAY });
+    return;
+  }
   const base = Math.max(Date.now(), Number(r.p.trialEndsAt) || 0);
-  await db.collection("distributors").doc(uid).update({ subscriptionStatus: "trial", trialEndsAt: base + days * DAY });
+  await ref.update({ subscriptionStatus: "trial", trialEndsAt: base + days * DAY });
 }
 
 async function cancel(uid) {

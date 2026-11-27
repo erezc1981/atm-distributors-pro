@@ -2,7 +2,7 @@
 // דפי האפליקציה: קודם רשת (כדי לקבל עדכונים), ובלי רשת - העותק השמור.
 // ספריות Firebase (כתובת עם גרסה קבועה): מהמטמון, ובפעם הראשונה מהרשת.
 // נתוני Firestore עצמם נשמרים ע"י Firebase (enablePersistence) ולא כאן.
-const CACHE = "atm-shell-v15";
+const CACHE = "atm-shell-v16";
 const SHELL = ["./", "./index.html", "./manifest.json", "./terms.html", "./privacy.html", "./accessibility.html", "./app.js"];
 const FIREBASE_LIBS = [
   "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js",
@@ -49,7 +49,7 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(req.url, { cache: "no-cache", credentials: "same-origin" })
         .then((res) => {
-          if (res.ok && (req.mode === "navigate" || /\.(html|json)$/.test(url.pathname) || url.pathname.endsWith("/"))) {
+          if (res.ok && (req.mode === "navigate" || /\.(html|json|js)$/.test(url.pathname) || url.pathname.endsWith("/"))) {
             const copy = res.clone();
             caches.open(CACHE).then((c) => c.put(req, copy));
           }
