@@ -289,12 +289,14 @@ function getEffectiveTargetK(t) {
   return Math.max(0, Math.round(baseK * totalFactor));
 }
 
+const SMALL_SHORTFALL_ILS = 2000;
 function calcLoadAmountILS(balance, targetK) {
   if (targetK === null || targetK === undefined) return 0;
   const targetAmount = Number(targetK) * 1000;
   const currentBal = Number(balance ?? 0);
   const rawDiff = Math.max(0, targetAmount - currentBal);
-  if (rawDiff === 0) return 0;
+  // חוסר קטן של עד 20 שטרות של 100 (2,000 ₪) - לא מטעינים. מ-21 שטרות ומעלה - מעגלים ל-5K
+  if (rawDiff <= SMALL_SHORTFALL_ILS) return 0;
   const roundedTo5k = Math.round(rawDiff / 5000) * 5000;
   return roundedTo5k > 0 ? roundedTo5k : 5000;
 }
