@@ -1423,6 +1423,38 @@ document.getElementById("whatsappBtn").addEventListener("click", () => {
   window.open(url, "_blank", "noopener");
 });
 
+// רשימת הערות + נייר לכל המסופים (לפי סדר הקו), להכנת ציוד לפני יציאה לקו
+document.getElementById("sendNotesBtn").addEventListener("click", () => {
+  const visible = currentTerminals.filter((t) => !t.hidden);
+  const items = [];
+  let paperCount = 0;
+  visible.forEach((t, idx) => {
+    const note = String(t.notes ?? "").trim();
+    const paper = Boolean(t.paperRollNeeded);
+    if (!note && !paper) return;
+    if (paper) paperCount += 1;
+    const lines = [`*${idx + 1}. ${t.name || t.id}* (${t.id})`];
+    if (paper) lines.push("   🧻 נייר להחלפה");
+    if (note) note.split(/\r?\n/).filter((l) => l.trim()).forEach((l) => lines.push(`   📝 ${l.trim()}`));
+    items.push(lines.join("\n"));
+  });
+  if (!items.length) {
+    closeSheets();
+    showToast("אין הערות או סימוני נייר במסופים כרגע.");
+    return;
+  }
+  const now = new Date();
+  const text = [
+    "*הערות למסופים - הכנת ציוד לקו*",
+    `${now.toLocaleDateString("he-IL")} · יום ${DAYS[now.getDay()]}`,
+    `${items.length} מסופים עם הערות${paperCount ? ` · 🧻 ${paperCount} צריכים נייר` : ""}`,
+    "",
+    items.join("\n\n")
+  ].join("\n");
+  closeSheets();
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+});
+
 renderDaysSelector([0, 2, 4]);
 renderRefillDayChips();
 applyAutoRules();
