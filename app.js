@@ -2246,8 +2246,8 @@ async function loadTrends() {
 }
 
 // ---------- היסטוריה ותכנון מילוי לפי ימי הקו ----------
-// היסטוריה שיובאה מקבצי הפעילות (distributors/{uid}/history/{YYYY-MM}) + מה שהמנוע אוסף (daily).
-// כרגע רק למפיץ הראשי (ADMIN_UID): הייבוא, הטבלה והחלת היעדים.
+// היסטוריה שהמפיץ העלה מדוחות עבר (distributors/{uid}/history/{YYYY-MM}) + מה שהמנוע אוסף (daily).
+// כל מפיץ מעלה את הדוחות שלו ומקבל המלצה לפי הנתונים האישיים שלו. עובדים רואים את הטבלה בלבד.
 const PLAN_WINDOW_DAYS = 91; // התכנון לפי 13 השבועות האחרונים שיש עליהם נתונים
 const PLAN_SAFETY = 1.15;     // כמו ב"יעד מומלץ" במגמות
 const PLAN_MIN_DAYS = 21;     // מינימום ימים רגילים למסוף כדי לתת המלצה
@@ -2255,10 +2255,10 @@ let historyCache = null;      // { uid, at, days: Map(date -> { tid: { tx, withd
 let lastPlan = null;
 
 function planEnabled() {
-  return dataUid === ADMIN_UID;
+  return Boolean(dataUid);
 }
 function canImportHistory() {
-  return Boolean(currentUser && currentUser.uid === ADMIN_UID && userRole === "owner");
+  return Boolean(currentUser && userRole === "owner" && dataUid === currentUser.uid);
 }
 
 // חג, ערב חג, רמדאן וימי העיד - לא נכנסים לממוצע של יום רגיל
@@ -2374,7 +2374,9 @@ function renderPlan(plan) {
   const out = document.getElementById("planOutput");
   const ok = plan ? plan.rows.filter((r) => r.enough) : [];
   if (!plan || !ok.length) {
-    out.innerHTML = "⏳ אין עדיין מספיק היסטוריה (צריך לפחות 3 שבועות של ימים רגילים למסוף).";
+    out.innerHTML = canImportHistory()
+      ? "⏳ אין עדיין מספיק היסטוריה (צריך לפחות 3 שבועות של ימים רגילים למסוף). יש לך דוחות פעילות יומית מהעבר? העלה אותם למטה ותקבל המלצה כבר עכשיו."
+      : "⏳ אין עדיין מספיק היסטוריה (צריך לפחות 3 שבועות של ימים רגילים למסוף).";
     return;
   }
   if (!plan.rd.length) {
@@ -2473,9 +2475,9 @@ async function clearPlanTargets() {
   loadPlan(false);
 }
 
-// קובץ "פעילות יומית לפי מסוף" (terminal,name,date,transactions,amount) או ייצוא "יעילות" (מסוף,שם,ת. ערך,עסקאות,...,סכום)
-function parseHistoryCsv(text) {
-  const lines = String(text).replace(/^﻿/, "").split(/\r?\n/).filter((l) => l.trim());
+// קובץ CSV -> שורות של תאים
+function csvToRows(text) {
+  const lines = String(text).replace(/^\uFEFF/, "").split(/\r?\n/).filter((l) => l.trim());
   const parseLine = (l) => {
     const out = [];
     let cur = "";
@@ -2490,23 +2492,97 @@ function parseHistoryCsv(text) {
     out.push(cur);
     return out.map((s) => s.trim());
   };
-  const hi = lines.findIndex((l) => /terminal|מסוף/.test(l));
+  return lines.map(parseLine);
+}
+
+// קובץ Excel ‏(xlsx) -> שורות של הגיליון הראשון. בלי ספריות: פותחים את ה-zip עם DecompressionStream של הדפדפן.
+async function xlsxToRows(buf) {
+  if (typeof DecompressionStream === "undefined") {
+    throw new Error("הדפדפן הזה לא פותח קובצי Excel. שמור את הקובץ כ-CSV ונסה שוב, או עדכן את הדפדפן.");
+  }
+  const bytes = new Uint8Array(buf);
+  const dv = new DataView(buf);
+  let eocd = -1;
+  for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 65557); i--) {
+    if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error("הקובץ לא נראה כמו קובץ Excel תקין.");
+  const entries = {};
+  let p = dv.getUint32(eocd + 16, true);
+  const count = dv.getUint16(eocd + 10, true);
+  const dec = new TextDecoder();
+  for (let n = 0; n < count && dv.getUint32(p, true) === 0x02014b50; n++) {
+    const method = dv.getUint16(p + 10, true);
+    const size = dv.getUint32(p + 20, true);
+    const nameLen = dv.getUint16(p + 28, true);
+    const extraLen = dv.getUint16(p + 30, true);
+    const commentLen = dv.getUint16(p + 32, true);
+    const local = dv.getUint32(p + 42, true);
+    const name = dec.decode(bytes.subarray(p + 46, p + 46 + nameLen));
+    entries[name] = { method, size, local };
+    p += 46 + nameLen + extraLen + commentLen;
+  }
+  const read = async (name) => {
+    const e = entries[name];
+    if (!e) return null;
+    const start = e.local + 30 + dv.getUint16(e.local + 26, true) + dv.getUint16(e.local + 28, true);
+    const data = bytes.subarray(start, start + e.size);
+    if (e.method === 0) return dec.decode(data);
+    if (e.method !== 8) throw new Error("פורמט דחיסה לא נתמך בקובץ.");
+    return new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text();
+  };
+  const xml = (s) => new DOMParser().parseFromString(s, "application/xml");
+  const textOf = (el) => Array.from(el.getElementsByTagName("t")).map((t) => t.textContent).join("");
+  const sharedXml = await read("xl/sharedStrings.xml");
+  const shared = sharedXml ? Array.from(xml(sharedXml).getElementsByTagName("si")).map(textOf) : [];
+  const sheetName = Object.keys(entries).filter((k) => /^xl\/worksheets\/sheet\d+\.xml$/.test(k))
+    .sort((a, b) => Number(a.match(/\d+/)[0]) - Number(b.match(/\d+/)[0]))[0];
+  if (!sheetName) throw new Error("לא נמצא גיליון בקובץ.");
+  const doc = xml(await read(sheetName));
+  const colIdx = (ref) => {
+    const letters = String(ref || "").replace(/[0-9]/g, "");
+    let n = 0;
+    for (const ch of letters) n = n * 26 + (ch.charCodeAt(0) - 64);
+    return n - 1;
+  };
+  return Array.from(doc.getElementsByTagName("row")).map((row) => {
+    const out = [];
+    Array.from(row.getElementsByTagName("c")).forEach((c, i) => {
+      const idx = c.getAttribute("r") ? colIdx(c.getAttribute("r")) : i;
+      const t = c.getAttribute("t");
+      const v = c.getElementsByTagName("v")[0];
+      let val = "";
+      if (t === "s") val = shared[Number(v && v.textContent)] ?? "";
+      else if (t === "inlineStr") val = textOf(c);
+      else val = v ? v.textContent : "";
+      out[idx] = String(val).trim();
+    });
+    for (let i = 0; i < out.length; i++) if (out[i] === undefined) out[i] = "";
+    return out;
+  }).filter((r) => r.some((x) => x));
+}
+
+// דוח "פעילות יומית לפי מסוף" (terminal,name,date,transactions,amount) או ייצוא "יעילות" (מסוף,שם,ת. ערך,עסקאות,...,סכום)
+function parseHistoryRows(table) {
+  const hi = table.findIndex((r) => r.some((x) => /^(terminal|מסוף|מספר מסוף)$/.test(x)));
   if (hi < 0) throw new Error("לא נמצאה בקובץ שורת כותרות (מסוף, תאריך, עסקאות, סכום).");
-  const h = parseLine(lines[hi]);
+  const h = table[hi];
   const col = (...names) => h.findIndex((x) => names.includes(x));
-  const cT = col("terminal", "מסוף");
-  const cN = col("name", "שם");
-  const cD = col("date", "ת. ערך", "תאריך");
+  const cT = col("terminal", "מסוף", "מספר מסוף");
+  const cN = col("name", "שם", "שם מסוף");
+  const cD = col("date", "ת. ערך", "תאריך", "ת.ערך");
   const cX = col("transactions", "עסקאות");
   const cA = col("amount", "סכום");
   if ([cT, cD, cX, cA].some((i) => i < 0)) throw new Error("חסרות בקובץ עמודות: מסוף, תאריך, עסקאות, סכום.");
   const num = (s) => Number(String(s || "0").replace(/,/g, ""));
   const rows = [];
-  lines.slice(hi + 1).forEach((l) => {
-    const v = parseLine(l);
-    const tid = v[cT];
+  table.slice(hi + 1).forEach((v) => {
+    const tid = String(v[cT] || "").replace(/\.0+$/, "");
     if (!/^\d{3,12}$/.test(tid || "")) return;
-    let date = v[cD] || "";
+    let date = String(v[cD] || "");
+    if (/^\d{5}(\.\d+)?$/.test(date)) { // תאריך של Excel כמספר סידורי
+      date = new Date(Date.UTC(1899, 11, 30) + Math.floor(Number(date)) * 864e5).toISOString().slice(0, 10);
+    }
     const m = date.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
     if (m) date = `${m[3].length === 2 ? "20" + m[3] : m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
@@ -2523,11 +2599,14 @@ async function importHistoryFile(file) {
   if (!file || !canImportHistory() || !guardManage()) return;
   let rows;
   try {
-    rows = parseHistoryCsv(await file.text());
+    const isXlsx = /\.xlsx$/i.test(file.name || "");
+    rows = parseHistoryRows(isXlsx ? await xlsxToRows(await file.arrayBuffer()) : csvToRows(await file.text()));
   } catch (e) {
     status.textContent = "⚠️ " + e.message;
     return;
   }
+  const today = localIsoDate(new Date());
+  rows = rows.filter((r) => r.date < today); // היום עוד לא נגמר - הסכום בו חלקי
   const norm = (s) => String(s || "").replace(/\s+/g, " ").trim();
   const byId = new Map(currentTerminals.map((t) => [String(t.id), t]));
   const byName = new Map(currentTerminals.map((t) => [norm(t.name), t]));
@@ -2576,9 +2655,16 @@ async function importHistoryFile(file) {
   loadPlan(true);
 }
 
-document.getElementById("historyFileInput").addEventListener("change", (e) => {
-  const f = e.target.files && e.target.files[0];
-  importHistoryFile(f).finally(() => { e.target.value = ""; });
+document.getElementById("historyFileInput").addEventListener("change", async (e) => {
+  const files = Array.from(e.target.files || []);
+  const status = document.getElementById("historyImportStatus");
+  const results = [];
+  for (const f of files) {
+    await importHistoryFile(f);
+    results.push(`${f.name}: ${status.textContent}`);
+  }
+  if (files.length > 1) status.textContent = results.join("\n");
+  e.target.value = "";
 });
 
 function monthRange(value) {

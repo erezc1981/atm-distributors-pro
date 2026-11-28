@@ -212,10 +212,10 @@ service cloud.firestore {
         allow write: if false;
       }
 
-      // היסטוריה שיובאה מקבצי פעילות (חודש לכל מסמך). כרגע רק למפיץ הראשי.
+      // דוחות עבר שהמפיץ העלה (חודש לכל מסמך): בסיס להמלצת המילוי האישית שלו
       match /history/{month} {
         allow read: if ownerOrActiveDriver(uid);
-        allow write: if isOwner(uid) && isAdmin()
+        allow write: if isOwner(uid) && hasValidSub(uid)
           && month.matches('^[0-9]{4}-[0-9]{2}$')
           && request.resource.data.keys().hasOnly(['month', 'days', 'source', 'importedAt'])
           && request.resource.data.month == month

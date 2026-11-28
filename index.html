@@ -898,9 +898,9 @@
           <div class="report-section-title">🗓️ כמה למלא בכל יום קו <span class="status-note">לפי ההיסטוריה של כל מסוף</span></div>
           <div id="planOutput" class="status-note">טוען...</div>
           <div id="historyImportBox" class="hidden" style="margin:12px 0 4px;">
-            <label for="historyFileInput" class="status-note" style="display:block;margin-bottom:4px;">📥 ייבוא היסטוריה: קובץ פעילות יומית (CSV) או ייצוא "יעילות" שנשמר כ-CSV. מסופים שלא ברשימה שלך לא נכללים.</label>
-            <input id="historyFileInput" type="file" accept=".csv,text/csv" />
-            <div id="historyImportStatus" class="status-note" style="margin-top:6px;"></div>
+            <label for="historyFileInput" class="status-note" style="display:block;margin-bottom:4px;">📥 העלאת דוחות עבר: דוח פעילות יומית לפי מסוף (Excel או CSV) עם העמודות מסוף, תאריך, עסקאות וסכום. אפשר לבחור כמה קבצים יחד. רק מסופים שברשימה שלך נכללים.</label>
+            <input id="historyFileInput" type="file" accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple />
+            <div id="historyImportStatus" class="status-note" style="margin-top:6px;white-space:pre-line;"></div>
           </div>
         </div>
         <div class="report-section-title">🧾 הטענות לפי חודש</div>
