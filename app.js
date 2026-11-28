@@ -74,8 +74,11 @@ const TRIAL_DAYS_DEFAULT = 30;
 const ADJUSTMENTS = {
   refillDay: { midweek: 0, thursday: 25 },
   monthPeriod: { regular: 0, salaries: 15, allowances: 15 },
-  jewishMode: { regular: 0, eve_holiday: 35, holiday: -75 },
-  arabMode: { regular: 0, eve_eid: 35, ramadan: 15 }
+  // אחוזי החגים לפי דוחות הפעילות של 2026 (יום חג מול יום רגיל באותו יום בשבוע, ±6 שבועות), עם מרווח ביטחון
+  jewishMode: { regular: 0, eve_holiday: 10, holiday: -30, yom_kippur: -75 },
+  arabMode: { regular: 0, pre_eid: 20, eve_eid: 45, eid: -30, ramadan: 10 },
+  // מסופים במגזר הערבי בחגים יהודיים: המשיכות עולות (נמדד +19% בערב חג, +32% בחג)
+  arabOnJewish: { regular: 0, eve_holiday: 30, holiday: 30, yom_kippur: 0 }
 };
 
 let currentUser = null;
@@ -296,8 +299,10 @@ function getEffectiveTargetK(t) {
     : sector === "jewish" || sector === "haredi"
       ? Number(ADJUSTMENTS.jewishMode?.[activeRules.jewishMode] ?? 0)
       : 0;
+  // חג יהודי שנבחר משפיע גם על מסופים במגזר הערבי (שם המשיכות עולות)
+  const crossPct = sector === "arab" ? Number(ADJUSTMENTS.arabOnJewish?.[activeRules.jewishMode] ?? 0) : 0;
 
-  const totalFactor = (1 + dayPct / 100) * (1 + periodPct / 100) * (1 + sectorPct / 100);
+  const totalFactor = (1 + dayPct / 100) * (1 + periodPct / 100) * (1 + sectorPct / 100) * (1 + crossPct / 100);
   return Math.max(0, Math.round(baseK * totalFactor));
 }
 
@@ -375,6 +380,7 @@ const HOLIDAY_CALENDAR = {
     "2028-09-29": "eve_holiday", "2028-09-30": "holiday",
     "2028-10-04": "eve_holiday", "2028-10-05": "holiday", "2028-10-11": "eve_holiday", "2028-10-12": "holiday"
   },
+  yomKippur: ["2026-09-21", "2027-10-11", "2028-09-30"],
   arabEves: ["2026-03-19", "2026-05-26", "2027-03-09", "2027-05-15", "2028-02-25", "2028-05-04"], // ערב עיד אל-פיטר / עיד אל-אדחא
   ramadan: [["2026-02-18", "2026-03-19"], ["2027-02-08", "2027-03-08"], ["2028-01-28", "2028-02-24"]] // טווחי רמדאן
 };
@@ -407,9 +413,13 @@ function manualExtraPct() {
 // רמז בלבד: איזה חג/מועד יוצא בתאריך הביקור (הבחירה עצמה ידנית)
 function holidayHintFor(iso) {
   const j = HOLIDAY_CALENDAR.jewish[iso];
+  if (HOLIDAY_CALENDAR.yomKippur.includes(iso)) return "יום כיפור";
   if (j === "eve_holiday") return "ערב חג";
   if (j === "holiday") return "חג";
   if (HOLIDAY_CALENDAR.arabEves.includes(iso)) return "ערב עיד";
+  const daysFromEve = HOLIDAY_CALENDAR.arabEves.map((eve) => (Date.parse(iso) - Date.parse(eve)) / 864e5);
+  if (daysFromEve.some((d) => d >= 1 && d <= 4)) return "עיד";
+  if (daysFromEve.some((d) => d >= -7 && d <= -1)) return "שבוע לפני עיד";
   if (HOLIDAY_CALENDAR.ramadan.some(([a, b]) => iso >= a && iso <= b)) return "רמדאן";
   return "";
 }
