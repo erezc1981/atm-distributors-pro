@@ -265,8 +265,19 @@ function getTerminalSector(t) {
   return "jewish";
 }
 
+// יעד לפי יום ביקור (נקבע מתוך "כמה למלא בכל יום קו"); אם אין - היעד הכללי
+function dayTargetK(t, dayIdx) {
+  const map = t && t.targetByDay;
+  if (!map || typeof map !== "object") return null;
+  const raw = map[String(dayIdx)];
+  if (raw === null || raw === undefined || raw === "") return null;
+  const num = Number(raw);
+  return Number.isFinite(num) && num >= 0 ? num : null;
+}
+
 function hasConfiguredTargetK(t) {
   if (!t) return false;
+  if (dayTargetK(t, activeRules.refillDay) !== null) return true;
   const raw = t.baseTargetK;
   if (raw === null || raw === undefined || raw === "") return false;
   const num = Number(raw);
@@ -275,7 +286,8 @@ function hasConfiguredTargetK(t) {
 
 function getEffectiveTargetK(t) {
   if (!hasConfiguredTargetK(t)) return null;
-  const baseK = Number(t.baseTargetK);
+  const perDay = dayTargetK(t, activeRules.refillDay);
+  const baseK = perDay !== null ? perDay : Number(t.baseTargetK);
   const dayPct = manualExtraPct();
   const periodPct = Number(ADJUSTMENTS.monthPeriod?.[activeRules.monthPeriod] ?? 0);
   const sector = getTerminalSector(t);
@@ -363,8 +375,8 @@ const HOLIDAY_CALENDAR = {
     "2028-09-29": "eve_holiday", "2028-09-30": "holiday",
     "2028-10-04": "eve_holiday", "2028-10-05": "holiday", "2028-10-11": "eve_holiday", "2028-10-12": "holiday"
   },
-  arabEves: ["2027-03-09", "2027-05-15", "2028-02-25", "2028-05-04"], // ערב עיד אל-פיטר / עיד אל-אדחא
-  ramadan: [["2027-02-08", "2027-03-08"], ["2028-01-28", "2028-02-24"]] // טווחי רמדאן
+  arabEves: ["2026-03-19", "2026-05-26", "2027-03-09", "2027-05-15", "2028-02-25", "2028-05-04"], // ערב עיד אל-פיטר / עיד אל-אדחא
+  ramadan: [["2026-02-18", "2026-03-19"], ["2027-02-08", "2027-03-08"], ["2028-01-28", "2028-02-24"]] // טווחי רמדאן
 };
 
 // מגזר חרדי: אין פעילות בשבת ובחג (מערב שבת/חג 14:00 ועד חצות של מוצאי השבת/החג)
@@ -2217,7 +2229,8 @@ async function loadTrends() {
   const flat = lastTrends.filter((x) => x.trend.key === "flat").length;
   const hasCompare = prev.length >= 3;
   const rows = lastTrends.map((x) => {
-    const current = hasConfiguredTargetK(x.t) ? `${Number(x.t.baseTargetK)}K` : "לא הוגדר";
+    const dk = dayTargetK(x.t, activeRules.refillDay);
+    const current = dk !== null ? `${dk}K` : hasConfiguredTargetK(x.t) ? `${Number(x.t.baseTargetK)}K` : "לא הוגדר";
     const left = x.daysLeft === null ? "אין משיכות" : x.daysLeft < 1 ? "⚠️ לא יספיק ליום שלם" : `יספיק לעוד ~${x.daysLeft.toFixed(1)} ימים`;
     return `<div class="trend-row trend-${x.trend.key}">
       <div class="trend-top"><b>${escapeHtml(x.t.name || x.t.id)}</b>${hasCompare ? `<span class="trend-badge">${x.trend.label}</span>` : ""}</div>
@@ -2231,6 +2244,342 @@ async function loadTrends() {
       : `<span class="chip">השוואת מגמה תופיע אחרי שבועיים של נתונים (${full.length} ימים כרגע)</span>`}</div>
     ${rows}`;
 }
+
+// ---------- היסטוריה ותכנון מילוי לפי ימי הקו ----------
+// היסטוריה שיובאה מקבצי הפעילות (distributors/{uid}/history/{YYYY-MM}) + מה שהמנוע אוסף (daily).
+// כרגע רק למפיץ הראשי (ADMIN_UID): הייבוא, הטבלה והחלת היעדים.
+const PLAN_WINDOW_DAYS = 91; // התכנון לפי 13 השבועות האחרונים שיש עליהם נתונים
+const PLAN_SAFETY = 1.15;     // כמו ב"יעד מומלץ" במגמות
+const PLAN_MIN_DAYS = 21;     // מינימום ימים רגילים למסוף כדי לתת המלצה
+let historyCache = null;      // { uid, at, days: Map(date -> { tid: { tx, withdrawn } }) }
+let lastPlan = null;
+
+function planEnabled() {
+  return dataUid === ADMIN_UID;
+}
+function canImportHistory() {
+  return Boolean(currentUser && currentUser.uid === ADMIN_UID && userRole === "owner");
+}
+
+// חג, ערב חג, רמדאן וימי העיד - לא נכנסים לממוצע של יום רגיל
+function isHolidayish(iso) {
+  if (HOLIDAY_CALENDAR.jewish[iso]) return true;
+  if (HOLIDAY_CALENDAR.ramadan.some(([a, b]) => iso >= a && iso <= b)) return true;
+  return HOLIDAY_CALENDAR.arabEves.some((eve) => {
+    const diff = (Date.parse(iso) - Date.parse(eve)) / 864e5;
+    return diff >= 0 && diff <= 4;
+  });
+}
+// גם ימי משכורות (8-12) וקצבאות (26-29) לא נכנסים לבסיס, כי יש להם התאמה נפרדת בחישוב
+function isPlanSpecialDate(iso) {
+  const dom = Number(iso.slice(8, 10));
+  if ((dom >= 8 && dom <= 12) || (dom >= 26 && dom <= 29)) return true;
+  return isHolidayish(iso);
+}
+
+async function loadHistoryDays(force) {
+  if (!dataUid) return new Map();
+  if (!force && historyCache && historyCache.uid === dataUid && Date.now() - historyCache.at < 10 * 60 * 1000) {
+    return historyCache.days;
+  }
+  const ref = db.collection("distributors").doc(dataUid);
+  const since = new Date();
+  since.setDate(since.getDate() - 400);
+  const [hist, daily] = await Promise.all([
+    ref.collection("history").get(),
+    ref.collection("daily").where("date", ">=", localIsoDate(since)).orderBy("date").get().catch(() => null)
+  ]);
+  const days = new Map();
+  const put = (date, terms) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !terms || typeof terms !== "object") return;
+    const row = days.get(date) || {};
+    Object.entries(terms).forEach(([tid, v]) => {
+      row[tid] = { tx: Number(v && v.tx) || 0, withdrawn: Number(v && v.withdrawn) || 0 };
+    });
+    days.set(date, row);
+  };
+  hist.docs.forEach((doc) => Object.entries((doc.data() || {}).days || {}).forEach(([date, terms]) => put(date, terms)));
+  const today = localIsoDate(new Date());
+  if (daily) {
+    daily.docs.forEach((doc) => {
+      const d = doc.data() || {};
+      if (d.date && d.date < today) put(d.date, d.terminals); // רק ימים שהסתיימו; המנוע גובר על הייבוא באותו יום
+    });
+  }
+  historyCache = { uid: dataUid, at: Date.now(), days };
+  return days;
+}
+
+function nextRouteGap(dayIdx, rd) {
+  for (let i = 1; i <= 7; i++) if (rd.includes((dayIdx + i) % 7)) return i;
+  return 7;
+}
+
+function computePlan(days, terminals) {
+  const dates = [...days.keys()].sort();
+  if (!dates.length) return null;
+  const lastDate = dates[dates.length - 1];
+  const fromMs = Date.parse(lastDate) - (PLAN_WINDOW_DAYS - 1) * 864e5;
+  const windowDates = dates.filter((d) => Date.parse(d) >= fromMs);
+  const rd = [...new Set(routeDays)].sort((a, b) => a - b);
+  const weekdayOf = (iso) => new Date(iso + "T12:00:00").getDay();
+
+  const rows = terminals.map((t) => {
+    const tid = String(t.id);
+    const first = dates.find((d) => days.get(d)[tid]);
+    if (!first) return { t, enough: false, n: 0 };
+    const sums = Array(7).fill(0);
+    const counts = Array(7).fill(0);
+    let allSum = 0;
+    let allN = 0;
+    windowDates.forEach((d) => {
+      if (d < first || isPlanSpecialDate(d)) return;
+      const v = (days.get(d)[tid] || {}).withdrawn || 0; // יום בלי שורה = בלי משיכות
+      const w = weekdayOf(d);
+      sums[w] += v; counts[w] += 1; allSum += v; allN += 1;
+    });
+    if (allN < PLAN_MIN_DAYS) return { t, enough: false, n: allN };
+    const overall = allSum / allN;
+    const wAvg = sums.map((s, i) => (counts[i] >= 3 ? s / counts[i] : overall));
+    const byDay = {};
+    rd.forEach((r) => {
+      const cover = nextRouteGap(r, rd);
+      let expected = 0;
+      for (let k = 0; k < cover; k++) expected += wAvg[(r + k) % 7];
+      byDay[r] = { cover, expected, k: Math.max(5, Math.ceil((expected * PLAN_SAFETY) / 5000) * 5) };
+    });
+    return { t, enough: true, n: allN, wAvg, overall, byDay };
+  });
+
+  // מה שנלמד לכל הקו: משכורות, קצבאות, ימי השבוע
+  const total = (d) => terminals.reduce((s, t) => s + (((days.get(d) || {})[String(t.id)] || {}).withdrawn || 0), 0);
+  const mean = (arr) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
+  const regularDates = windowDates.filter((d) => !isPlanSpecialDate(d));
+  const regular = mean(regularDates.map(total));
+  const domIn = (d, a, b) => { const n = Number(d.slice(8, 10)); return n >= a && n <= b; };
+  const sal = mean(windowDates.filter((d) => domIn(d, 8, 12) && !isHolidayish(d)).map(total));
+  const alw = mean(windowDates.filter((d) => domIn(d, 26, 29) && !isHolidayish(d)).map(total));
+  const wk = Array.from({ length: 7 }, (_, w) => mean(regularDates.filter((d) => weekdayOf(d) === w).map(total)));
+  const learned = regular ? {
+    salaries: sal !== null ? sal / regular - 1 : null,
+    allowances: alw !== null ? alw / regular - 1 : null,
+    strongDay: wk.indexOf(Math.max(...wk.filter((x) => x !== null))),
+    weakDay: wk.indexOf(Math.min(...wk.filter((x) => x !== null)))
+  } : null;
+
+  return { rows, rd, from: windowDates[0], to: lastDate, learned };
+}
+
+function renderPlan(plan) {
+  const out = document.getElementById("planOutput");
+  const ok = plan ? plan.rows.filter((r) => r.enough) : [];
+  if (!plan || !ok.length) {
+    out.innerHTML = "⏳ אין עדיין מספיק היסטוריה (צריך לפחות 3 שבועות של ימים רגילים למסוף).";
+    return;
+  }
+  if (!plan.rd.length) {
+    out.textContent = "לא הוגדרו ימי קו בהגדרות.";
+    return;
+  }
+  const fmtD = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("he-IL");
+  const pct = (v) => (v === null || !Number.isFinite(v) ? "—" : `${v >= 0 ? "+" : ""}${Math.round(v * 100)}%`);
+  const covers = plan.rd.map((d) => nextRouteGap(d, plan.rd));
+  const totals = plan.rd.map(() => 0);
+  const head = plan.rd.map((d, i) => `<th>${DAYS[d]}<br><span class="plan-sub">ל-${covers[i]} ${covers[i] === 1 ? "יום" : "ימים"}</span></th>`).join("");
+  const body = plan.rows.map((r) => {
+    const name = escapeHtml(r.t.name || r.t.id);
+    if (!r.enough) return `<tr><td>${name}</td><td colspan="${plan.rd.length + 1}" class="plan-sub">אין מספיק נתונים (${r.n} ימים)</td></tr>`;
+    const cells = plan.rd.map((d, i) => {
+      totals[i] += r.byDay[d].k;
+      const cur = dayTargetK(r.t, d);
+      const note = cur === null ? "" : cur === r.byDay[d].k ? ' <span class="plan-sub">✓</span>' : `<br><span class="plan-sub">מוגדר ${cur}K</span>`;
+      return `<td><b>${r.byDay[d].k}K</b>${note}</td>`;
+    }).join("");
+    const base = r.t.baseTargetK !== null && r.t.baseTargetK !== undefined && r.t.baseTargetK !== "" ? `${Number(r.t.baseTargetK)}K` : "—";
+    return `<tr><td>${name}<br><span class="plan-sub">₪${formatAmountILS(Math.round(r.overall))} ביום רגיל</span></td>${cells}<td>${base}</td></tr>`;
+  }).join("");
+  const foot = `<tr class="plan-total"><td>סה"כ לקו</td>${totals.map((v) => `<td>${v}K</td>`).join("")}<td></td></tr>`;
+  const L = plan.learned;
+  const learnedHtml = L ? `<div class="plan-learned">💡 מה עולה מהנתונים (${fmtD(plan.from)}–${fmtD(plan.to)}):
+      ב-8–12 בחודש (משכורות) נמשך ${pct(L.salaries)} לעומת יום רגיל, וב-26–29 (קצבאות) ${pct(L.allowances)}.
+      בחישוב מוגדרת תוספת של ${ADJUSTMENTS.monthPeriod.salaries}% לשתי התקופות.
+      היום החזק בשבוע: ${DAYS[L.strongDay]}, החלש: ${DAYS[L.weakDay]}.</div>` : "";
+  out.innerHTML = `
+    <div class="plan-sub" style="margin:4px 0 6px;">יעד מילוי ליום רגיל: הממוצע של כל מסוף בכל יום בשבוע, מהביקור ועד הביקור הבא, ועוד 15% ביטחון, מעוגל ל-5K. ההתאמות של משכורות, קצבאות וחגים מתווספות עליו בחישוב כרגיל.</div>
+    <div class="plan-wrap"><table class="report-table plan-table">
+      <tr><th>מסוף</th>${head}<th>יעד כללי</th></tr>${body}${foot}
+    </table></div>
+    ${learnedHtml}
+    ${canImportHistory() ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+      <button id="applyPlanBtn" type="button" class="btn-primary">✅ החל כיעד לפי יום ביקור</button>
+      <button id="clearPlanBtn" type="button">בטל יעדים לפי יום</button>
+    </div>` : ""}`;
+  const applyBtn = document.getElementById("applyPlanBtn");
+  if (applyBtn) applyBtn.addEventListener("click", applyPlanTargets);
+  const clearBtn = document.getElementById("clearPlanBtn");
+  if (clearBtn) clearBtn.addEventListener("click", clearPlanTargets);
+}
+
+async function loadPlan(force) {
+  const box = document.getElementById("planSection");
+  if (!box) return;
+  box.classList.toggle("hidden", !planEnabled());
+  if (!planEnabled()) return;
+  document.getElementById("historyImportBox").classList.toggle("hidden", !canImportHistory());
+  const out = document.getElementById("planOutput");
+  out.textContent = "טוען...";
+  let days;
+  try {
+    days = await loadHistoryDays(force);
+  } catch (err) {
+    out.textContent = errorHe(err, "טעינת ההיסטוריה נכשלה");
+    return;
+  }
+  lastPlan = computePlan(days, currentTerminals.filter((t) => !t.hidden));
+  renderPlan(lastPlan);
+}
+
+async function writeDayTargets(build, doneMsg) {
+  const ok = lastPlan ? lastPlan.rows.filter((r) => r.enough) : [];
+  if (!ok.length) return;
+  const batch = db.batch();
+  ok.forEach((r) => {
+    batch.update(db.collection("distributors").doc(dataUid).collection("terminals").doc(String(r.t.id)),
+      { targetByDay: build(r) });
+  });
+  try {
+    await batch.commit();
+    showToast(doneMsg(ok.length));
+  } catch (err) {
+    alert(errorHe(err, "העדכון נכשל"));
+  }
+}
+
+async function applyPlanTargets() {
+  if (!canImportHistory() || !guardManage() || !lastPlan) return;
+  if (!confirm("לקבוע לכל מסוף יעד מילוי לפי יום הביקור, לפי הטבלה? היעד הכללי נשאר לימים שאין להם יעד.")) return;
+  await writeDayTargets((r) => {
+    const map = {};
+    lastPlan.rd.forEach((d) => { map[String(d)] = r.byDay[d].k; });
+    return map;
+  }, (n) => `נקבעו יעדים לפי יום ל-${n} מסופים`);
+  loadPlan(false);
+}
+
+async function clearPlanTargets() {
+  if (!canImportHistory() || !guardManage() || !lastPlan) return;
+  if (!confirm("לבטל את היעדים לפי יום ולחזור ליעד הכללי של כל מסוף?")) return;
+  await writeDayTargets(() => firebase.firestore.FieldValue.delete(), (n) => `בוטלו היעדים לפי יום ב-${n} מסופים`);
+  loadPlan(false);
+}
+
+// קובץ "פעילות יומית לפי מסוף" (terminal,name,date,transactions,amount) או ייצוא "יעילות" (מסוף,שם,ת. ערך,עסקאות,...,סכום)
+function parseHistoryCsv(text) {
+  const lines = String(text).replace(/^﻿/, "").split(/\r?\n/).filter((l) => l.trim());
+  const parseLine = (l) => {
+    const out = [];
+    let cur = "";
+    let q = false;
+    for (let i = 0; i < l.length; i++) {
+      const c = l[i];
+      if (q) {
+        if (c === '"') { if (l[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c;
+      } else if (c === '"') q = true;
+      else if (c === ",") { out.push(cur); cur = ""; } else cur += c;
+    }
+    out.push(cur);
+    return out.map((s) => s.trim());
+  };
+  const hi = lines.findIndex((l) => /terminal|מסוף/.test(l));
+  if (hi < 0) throw new Error("לא נמצאה בקובץ שורת כותרות (מסוף, תאריך, עסקאות, סכום).");
+  const h = parseLine(lines[hi]);
+  const col = (...names) => h.findIndex((x) => names.includes(x));
+  const cT = col("terminal", "מסוף");
+  const cN = col("name", "שם");
+  const cD = col("date", "ת. ערך", "תאריך");
+  const cX = col("transactions", "עסקאות");
+  const cA = col("amount", "סכום");
+  if ([cT, cD, cX, cA].some((i) => i < 0)) throw new Error("חסרות בקובץ עמודות: מסוף, תאריך, עסקאות, סכום.");
+  const num = (s) => Number(String(s || "0").replace(/,/g, ""));
+  const rows = [];
+  lines.slice(hi + 1).forEach((l) => {
+    const v = parseLine(l);
+    const tid = v[cT];
+    if (!/^\d{3,12}$/.test(tid || "")) return;
+    let date = v[cD] || "";
+    const m = date.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+    if (m) date = `${m[3].length === 2 ? "20" + m[3] : m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+    const tx = Math.round(num(v[cX]));
+    const withdrawn = Math.round(num(v[cA]));
+    if (!Number.isFinite(tx) || !Number.isFinite(withdrawn)) return;
+    rows.push({ tid, name: cN >= 0 ? (v[cN] || "").replace(/\s+/g, " ").trim() : "", date, tx, withdrawn });
+  });
+  return rows;
+}
+
+async function importHistoryFile(file) {
+  const status = document.getElementById("historyImportStatus");
+  if (!file || !canImportHistory() || !guardManage()) return;
+  let rows;
+  try {
+    rows = parseHistoryCsv(await file.text());
+  } catch (e) {
+    status.textContent = "⚠️ " + e.message;
+    return;
+  }
+  const norm = (s) => String(s || "").replace(/\s+/g, " ").trim();
+  const byId = new Map(currentTerminals.map((t) => [String(t.id), t]));
+  const byName = new Map(currentTerminals.map((t) => [norm(t.name), t]));
+  const skipped = new Set();
+  const months = {};
+  rows.forEach((r) => {
+    const t = byId.get(r.tid) || (r.name && byName.get(norm(r.name)));
+    if (!t) { skipped.add(r.name ? `${r.name} (${r.tid})` : r.tid); return; } // מסוף שלא ברשימה שלך - לא נכלל
+    const mk = r.date.slice(0, 7);
+    months[mk] = months[mk] || {};
+    months[mk][r.date] = months[mk][r.date] || {};
+    const prev = months[mk][r.date][String(t.id)];
+    if (!prev || r.withdrawn > prev.withdrawn) months[mk][r.date][String(t.id)] = { tx: r.tx, withdrawn: r.withdrawn };
+  });
+  const keys = Object.keys(months).sort();
+  if (!keys.length) {
+    status.textContent = "⚠️ לא נמצאו בקובץ שורות של המסופים שלך.";
+    return;
+  }
+  status.textContent = "שומר...";
+  const ref = db.collection("distributors").doc(dataUid).collection("history");
+  let count = 0;
+  try {
+    for (const mk of keys) {
+      const snap = await ref.doc(mk).get();
+      const merged = { ...(snap.exists ? ((snap.data() || {}).days || {}) : {}) };
+      Object.entries(months[mk]).forEach(([date, terms]) => {
+        merged[date] = { ...(merged[date] || {}) };
+        Object.entries(terms).forEach(([tid, v]) => {
+          const p = merged[date][tid];
+          // יום שמופיע פעמיים (למשל היום האחרון החלקי בייצוא) - נשאר הסכום המלא
+          if (!p || v.withdrawn >= Number(p.withdrawn || 0)) merged[date][tid] = v;
+          count++;
+        });
+      });
+      await ref.doc(mk).set({ month: mk, days: merged, source: "import", importedAt: Date.now() });
+    }
+  } catch (err) {
+    status.textContent = errorHe(err, "השמירה נכשלה");
+    return;
+  }
+  const list = [...skipped];
+  status.textContent = `✅ נשמרו ${count} שורות, ${keys[0]} עד ${keys[keys.length - 1]}.`
+    + (list.length ? ` לא נכללו (לא ברשימת המסופים שלך): ${list.slice(0, 8).join(", ")}${list.length > 8 ? "..." : ""}` : "");
+  historyCache = null;
+  loadPlan(true);
+}
+
+document.getElementById("historyFileInput").addEventListener("change", (e) => {
+  const f = e.target.files && e.target.files[0];
+  importHistoryFile(f).finally(() => { e.target.value = ""; });
+});
 
 function monthRange(value) {
   const [y, m] = String(value).split("-").map(Number);
@@ -2294,6 +2643,7 @@ document.getElementById("toggleReportsBtn").addEventListener("click", () => {
   if (!panel.classList.contains("hidden")) {
     loadReport();
     loadTrends();
+    loadPlan();
   }
 });
 
