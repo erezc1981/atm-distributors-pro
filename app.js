@@ -2260,7 +2260,11 @@ async function loadTrends() {
 // היסטוריה שהמפיץ העלה מדוחות עבר (distributors/{uid}/history/{YYYY-MM}) + מה שהמנוע אוסף (daily).
 // כל מפיץ מעלה את הדוחות שלו ומקבל המלצה לפי הנתונים האישיים שלו. עובדים רואים את הטבלה בלבד.
 const PLAN_WINDOW_DAYS = 91; // התכנון לפי 13 השבועות האחרונים שיש עליהם נתונים
-const PLAN_SAFETY = 1.15;     // כמו ב"יעד מומלץ" במגמות
+// מקדם ביטחון לכל מסוף: כמה הצריכה בפועל עד הביקור הבא חרגה מהממוצע (אחוזון 90), בין 10% ל-60%
+const SAFETY_QUANTILE = 0.9;
+const SAFETY_MIN = 0.10;
+const SAFETY_MAX = 0.60;
+const SAFETY_FALLBACK = 0.25; // כשיש פחות מ-6 ביקורים להשוואה
 const PLAN_MIN_DAYS = 21;     // מינימום ימים רגילים למסוף כדי לתת המלצה
 let historyCache = null;      // { uid, at, days: Map(date -> { tid: { tx, withdrawn } }) }
 let lastPlan = null;
@@ -2352,14 +2356,35 @@ function computePlan(days, terminals) {
     if (allN < PLAN_MIN_DAYS) return { t, enough: false, n: allN };
     const overall = allSum / allN;
     const wAvg = sums.map((s, i) => (counts[i] >= 3 ? s / counts[i] : overall));
+    const spanExpected = (r) => {
+      let e = 0;
+      for (let k = 0; k < nextRouteGap(r, rd); k++) e += wAvg[(r + k) % 7];
+      return e;
+    };
+    // כמה נמשך בפועל מכל יום קו בחלון ועד הביקור הבא, ביחס לצפוי (בלי תקופות שיש בהן חג או משכורות)
+    const ratios = [];
+    windowDates.forEach((d) => {
+      const r = weekdayOf(d);
+      if (d < first || !rd.includes(r)) return;
+      const span = Array.from({ length: nextRouteGap(r, rd) }, (_, k) => localIsoDate(new Date(Date.parse(d + "T12:00:00") + k * 864e5)));
+      if (span.some((x) => x > lastDate || !days.has(x) || isPlanSpecialDate(x))) return;
+      const e = spanExpected(r);
+      if (e > 0) ratios.push(span.reduce((s, x) => s + ((days.get(x)[tid] || {}).withdrawn || 0), 0) / e);
+    });
+    let safety = SAFETY_FALLBACK;
+    if (ratios.length >= 6) {
+      ratios.sort((a, b) => a - b);
+      const q = ratios[Math.min(ratios.length - 1, Math.ceil(SAFETY_QUANTILE * ratios.length) - 1)] - 1;
+      safety = Math.min(SAFETY_MAX, Math.max(SAFETY_MIN, q));
+    }
     const byDay = {};
     rd.forEach((r) => {
       const cover = nextRouteGap(r, rd);
       let expected = 0;
       for (let k = 0; k < cover; k++) expected += wAvg[(r + k) % 7];
-      byDay[r] = { cover, expected, k: Math.max(5, Math.ceil((expected * PLAN_SAFETY) / 5000) * 5) };
+      byDay[r] = { cover, expected, k: Math.max(5, Math.ceil((expected * (1 + safety)) / 5000) * 5) };
     });
-    return { t, enough: true, n: allN, wAvg, overall, byDay };
+    return { t, enough: true, n: allN, wAvg, overall, byDay, safety, samples: ratios.length };
   });
 
   // מה שנלמד לכל הקו: משכורות, קצבאות, ימי השבוע
@@ -2422,7 +2447,7 @@ function renderPlan(plan) {
       return `<td><b>${r.byDay[d].k}K</b>${note}</td>`;
     }).join("");
     const base = r.t.baseTargetK !== null && r.t.baseTargetK !== undefined && r.t.baseTargetK !== "" ? `${Number(r.t.baseTargetK)}K` : "—";
-    return `<tr><td>${name}<br><span class="plan-sub">₪${formatAmountILS(Math.round(r.overall))} ביום רגיל</span></td>${cells}<td>${base}</td></tr>`;
+    return `<tr><td>${name}<br><span class="plan-sub">₪${formatAmountILS(Math.round(r.overall))} ביום רגיל · ביטחון ${Math.round(r.safety * 100)}%</span></td>${cells}<td>${base}</td></tr>`;
   }).join("");
   const foot = `<tr class="plan-total"><td>סה"כ לקו</td>${totals.map((v) => `<td>${v}K</td>`).join("")}<td></td></tr>`;
   const L = plan.learned;
@@ -2431,7 +2456,7 @@ function renderPlan(plan) {
       התוספת בחישוב: משכורות +${ADJUSTMENTS.monthPeriod.salaries}%, קצבאות +${ADJUSTMENTS.monthPeriod.allowances}%${periodPctSource === "learned" ? " - לפי הנתונים שלך ועוד 5% ביטחון." : " (ברירת מחדל)."}
       היום החזק בשבוע: ${DAYS[L.strongDay]}, החלש: ${DAYS[L.weakDay]}.</div>` : "";
   out.innerHTML = `
-    <div class="plan-sub" style="margin:4px 0 6px;">יעד מילוי ליום רגיל: הממוצע של כל מסוף בכל יום בשבוע, מהביקור ועד הביקור הבא, ועוד 15% ביטחון, מעוגל ל-5K. ההתאמות של משכורות, קצבאות וחגים מתווספות עליו בחישוב כרגיל.</div>
+    <div class="plan-sub" style="margin:4px 0 6px;">יעד מילוי ליום רגיל: הממוצע של כל מסוף בכל יום בשבוע, מהביקור ועד הביקור הבא, ועוד מקדם ביטחון אישי למסוף, מעוגל ל-5K. מסוף שהצריכה בו קופצת מקבל מקדם גבוה יותר (10%–60%, לפי כמה חרג מהממוצע ב-13 השבועות האחרונים). ההתאמות של משכורות, קצבאות וחגים מתווספות עליו בחישוב כרגיל.</div>
     <div class="plan-wrap"><table class="report-table plan-table">
       <tr><th>מסוף</th>${head}<th>יעד כללי</th></tr>${body}${foot}
     </table></div>
