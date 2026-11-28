@@ -1024,6 +1024,7 @@ function bindUserListeners(uid) {
     const data = snap.exists ? (snap.data() || {}) : {};
     const days = Array.isArray(data.days) && data.days.length ? data.days : [0, 2, 4];
     routeDays = days.map(Number).filter((d) => d >= 0 && d <= 6);
+    applyPeriodPct(data.periodPct && typeof data.periodPct === "object" ? data.periodPct : null, "learned");
     renderDaysSelector(routeDays);
     let local = null;
     try { local = JSON.parse(localStorage.getItem(`atm_rules_${uid}`) || "null"); } catch (e) { /* ignore */ }
@@ -2356,13 +2357,26 @@ function computePlan(days, terminals) {
   const mean = (arr) => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
   const regularDates = windowDates.filter((d) => !isPlanSpecialDate(d));
   const regular = mean(regularDates.map(total));
-  const domIn = (d, a, b) => { const n = Number(d.slice(8, 10)); return n >= a && n <= b; };
-  const sal = mean(windowDates.filter((d) => domIn(d, 8, 12) && !isHolidayish(d)).map(total));
-  const alw = mean(windowDates.filter((d) => domIn(d, 26, 29) && !isHolidayish(d)).map(total));
+  // משכורות/קצבאות: בכל חודש משווים לימים הרגילים של אותו חודש (כך שינוי במספר המסופים לא מטה), 6 חודשים אחרונים
+  const sinceMs = Date.parse(lastDate) - 179 * 864e5;
+  const byMonth = {};
+  dates.filter((d) => Date.parse(d) >= sinceMs && !isHolidayish(d)).forEach((d) => {
+    const dom = Number(d.slice(8, 10));
+    const kind = dom >= 8 && dom <= 12 ? "sal" : dom >= 26 && dom <= 29 ? "alw" : "reg";
+    const b = byMonth[d.slice(0, 7)] = byMonth[d.slice(0, 7)] || { reg: [], sal: [], alw: [] };
+    b[kind].push(total(d));
+  });
+  const ratios = { sal: [], alw: [] };
+  Object.values(byMonth).forEach((b) => {
+    const r = mean(b.reg);
+    if (!r || b.reg.length < 8) return;
+    ["sal", "alw"].forEach((k) => { if (b[k].length >= 2) ratios[k].push(mean(b[k]) / r - 1); });
+  });
   const wk = Array.from({ length: 7 }, (_, w) => mean(regularDates.filter((d) => weekdayOf(d) === w).map(total)));
   const learned = regular ? {
-    salaries: sal !== null ? sal / regular - 1 : null,
-    allowances: alw !== null ? alw / regular - 1 : null,
+    salaries: ratios.sal.length >= 2 ? mean(ratios.sal) : null,
+    allowances: ratios.alw.length >= 2 ? mean(ratios.alw) : null,
+    months: Math.min(ratios.sal.length, ratios.alw.length),
     strongDay: wk.indexOf(Math.max(...wk.filter((x) => x !== null))),
     weakDay: wk.indexOf(Math.min(...wk.filter((x) => x !== null)))
   } : null;
@@ -2403,8 +2417,8 @@ function renderPlan(plan) {
   const foot = `<tr class="plan-total"><td>סה"כ לקו</td>${totals.map((v) => `<td>${v}K</td>`).join("")}<td></td></tr>`;
   const L = plan.learned;
   const learnedHtml = L ? `<div class="plan-learned">💡 מה עולה מהנתונים (${fmtD(plan.from)}–${fmtD(plan.to)}):
-      ב-8–12 בחודש (משכורות) נמשך ${pct(L.salaries)} לעומת יום רגיל, וב-26–29 (קצבאות) ${pct(L.allowances)}.
-      בחישוב מוגדרת תוספת של ${ADJUSTMENTS.monthPeriod.salaries}% לשתי התקופות.
+      ב-8–12 בחודש (משכורות) נמשך ${pct(L.salaries)} לעומת יום רגיל, וב-26–29 (קצבאות) ${pct(L.allowances)}${L.months ? ` (ממוצע של ${L.months} חודשים)` : ""}.
+      התוספת בחישוב: משכורות +${ADJUSTMENTS.monthPeriod.salaries}%, קצבאות +${ADJUSTMENTS.monthPeriod.allowances}%${periodPctSource === "learned" ? " - לפי הנתונים שלך ועוד 5% ביטחון." : " (ברירת מחדל)."}
       היום החזק בשבוע: ${DAYS[L.strongDay]}, החלש: ${DAYS[L.weakDay]}.</div>` : "";
   out.innerHTML = `
     <div class="plan-sub" style="margin:4px 0 6px;">יעד מילוי ליום רגיל: הממוצע של כל מסוף בכל יום בשבוע, מהביקור ועד הביקור הבא, ועוד 15% ביטחון, מעוגל ל-5K. ההתאמות של משכורות, קצבאות וחגים מתווספות עליו בחישוב כרגיל.</div>
@@ -2438,7 +2452,48 @@ async function loadPlan(force) {
     return;
   }
   lastPlan = computePlan(days, currentTerminals.filter((t) => !t.hidden));
+  await syncPeriodPct(lastPlan && lastPlan.learned);
   renderPlan(lastPlan);
+}
+
+// ---------- תוספת משכורות/קצבאות לפי הנתונים של המפיץ ----------
+const DEFAULT_PERIOD_PCT = { salaries: 15, allowances: 15 };
+let periodPctSource = "default";
+
+// מה שנמדד + 5% ביטחון, מעוגל למעלה ל-5%, בין 5% ל-100%
+function learnedPct(v) {
+  if (v === null || v === undefined || !Number.isFinite(v)) return null;
+  return Math.min(100, Math.max(5, Math.ceil((v * 100 + 5) / 5) * 5));
+}
+
+function applyPeriodPct(p, source) {
+  const ok = (n) => Number.isFinite(Number(n)) && Number(n) >= 0 && Number(n) <= 100;
+  ADJUSTMENTS.monthPeriod.salaries = p && ok(p.salaries) ? Number(p.salaries) : DEFAULT_PERIOD_PCT.salaries;
+  ADJUSTMENTS.monthPeriod.allowances = p && ok(p.allowances) ? Number(p.allowances) : DEFAULT_PERIOD_PCT.allowances;
+  periodPctSource = p ? source : "default";
+  const label = { salaries: "משכורות (8–12)", allowances: "קצבאות (26–29)" };
+  document.querySelectorAll('.chip-btn[data-rule-group="monthPeriod"]').forEach((btn) => {
+    const v = btn.getAttribute("data-rule-val");
+    if (label[v]) btn.textContent = `${label[v]} +${ADJUSTMENTS.monthPeriod[v]}%`;
+  });
+  syncRuleChipButtons();
+  updateStatsAndList(currentTerminals);
+}
+
+// נשמר אצל המפיץ (settings/route) כדי שגם העובדים והמסך הראשי יחשבו לפיו
+async function syncPeriodPct(learned) {
+  if (!canImportHistory() || !learned) return;
+  const sal = learnedPct(learned.salaries);
+  const alw = learnedPct(learned.allowances);
+  if (sal === null || alw === null) return;
+  if (periodPctSource === "learned" && sal === ADJUSTMENTS.monthPeriod.salaries && alw === ADJUSTMENTS.monthPeriod.allowances) return;
+  try {
+    await db.collection("distributors").doc(dataUid).collection("settings").doc("route")
+      .set({ days: routeDays, periodPct: { salaries: sal, allowances: alw, at: Date.now() } }, { merge: true });
+    applyPeriodPct({ salaries: sal, allowances: alw }, "learned");
+  } catch (err) {
+    console.warn("period pct save:", err && err.code);
+  }
 }
 
 async function writeDayTargets(build, doneMsg) {

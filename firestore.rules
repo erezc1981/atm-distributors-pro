@@ -69,7 +69,11 @@ service cloud.firestore {
 
     function validRoute(d) {
       return d.days is list && d.days.size() <= 7
-        && (!('calcModes' in d) || (d.calcModes is map && d.calcModes.size() <= 6));
+        && (!('calcModes' in d) || (d.calcModes is map && d.calcModes.size() <= 6))
+        && (!('periodPct' in d) || (d.periodPct is map
+            && d.periodPct.keys().hasOnly(['salaries', 'allowances', 'at'])
+            && d.periodPct.salaries is number && d.periodPct.salaries >= 0 && d.periodPct.salaries <= 100
+            && d.periodPct.allowances is number && d.periodPct.allowances >= 0 && d.periodPct.allowances <= 100));
     }
 
     function changedKeys() {
@@ -240,11 +244,11 @@ service cloud.firestore {
         allow read: if ownerOrActiveDriver(uid);
         allow create: if isOwner(uid)
           && hasValidSub(uid)
-          && request.resource.data.keys().hasOnly(['days', 'updatedAt', 'calcModes'])
+          && request.resource.data.keys().hasOnly(['days', 'updatedAt', 'calcModes', 'periodPct'])
           && validRoute(request.resource.data);
         allow update: if isOwner(uid)
           && hasValidSub(uid)
-          && changedKeys().hasOnly(['days', 'updatedAt', 'calcModes'])
+          && changedKeys().hasOnly(['days', 'updatedAt', 'calcModes', 'periodPct'])
           && validRoute(request.resource.data);
       }
 
