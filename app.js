@@ -75,9 +75,9 @@ const ADJUSTMENTS = {
   refillDay: { midweek: 0, thursday: 25 },
   monthPeriod: { regular: 0, salaries: 15, allowances: 15 },
   // אחוזי החגים לפי דוחות הפעילות של 2026 (יום חג מול יום רגיל באותו יום בשבוע, ±6 שבועות), עם מרווח ביטחון
-  jewishMode: { regular: 0, eve_holiday: 10, holiday: -20, yom_kippur: -75 },
-  arabMode: { regular: 0, pre_eid: 20, eve_eid: 35, eid: -30, ramadan: 10 },
-  // מסופים במגזר הערבי בחגים יהודיים: המשיכות עולות (נמדד +15% בערב חג, +38% בחג)
+  jewishMode: { regular: 0, eve_holiday: 10, holiday: -30, yom_kippur: -75 },
+  arabMode: { regular: 0, pre_eid: 20, eve_eid: 45, eid: -30, ramadan: 10 },
+  // מסופים במגזר הערבי בחגים יהודיים: המשיכות עולות (נמדד +19% בערב חג, +32% בחג)
   arabOnJewish: { regular: 0, eve_holiday: 30, holiday: 30, yom_kippur: 0 }
 };
 
