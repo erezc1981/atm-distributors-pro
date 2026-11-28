@@ -556,6 +556,11 @@
     .report-table { border-collapse: collapse; width: 100%; margin-top: 10px; font-size: 0.86rem; color: var(--text); }
     .report-table th, .report-table td { border-bottom: 1px solid var(--border); padding: 7px 8px; text-align: right; }
     .report-table th { background: #f8fafc; font-weight: 800; }
+    .plan-wrap { overflow-x: auto; }
+    .plan-table td, .plan-table th { white-space: nowrap; }
+    .plan-sub { color: var(--muted); font-size: 0.76rem; font-weight: 400; }
+    .plan-total td { font-weight: 800; background: #f8fafc; }
+    .plan-learned { margin-top: 10px; font-size: 0.84rem; line-height: 1.5; }
 
     /* ===== חלון תשלום ===== */
     .modal-backdrop {
@@ -889,6 +894,15 @@
         <div class="sheet-head"><strong>📊 דוחות</strong><button type="button" class="sheet-close" data-close-sheet aria-label="סגור">✕</button></div>
         <div class="report-section-title">📈 מגמות ותחזית <span class="status-note">7 ימים אחרונים מול 7 שלפניהם</span></div>
         <div id="trendsOutput" class="status-note">טוען...</div>
+        <div id="planSection" class="hidden">
+          <div class="report-section-title">🗓️ כמה למלא בכל יום קו <span class="status-note">לפי ההיסטוריה של כל מסוף</span></div>
+          <div id="planOutput" class="status-note">טוען...</div>
+          <div id="historyImportBox" class="hidden" style="margin:12px 0 4px;">
+            <label for="historyFileInput" class="status-note" style="display:block;margin-bottom:4px;">📥 ייבוא היסטוריה: קובץ פעילות יומית (CSV) או ייצוא "יעילות" שנשמר כ-CSV. מסופים שלא ברשימה שלך לא נכללים.</label>
+            <input id="historyFileInput" type="file" accept=".csv,text/csv" />
+            <div id="historyImportStatus" class="status-note" style="margin-top:6px;"></div>
+          </div>
+        </div>
         <div class="report-section-title">🧾 הטענות לפי חודש</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0;">
           <input id="reportMonthInput" aria-label="חודש הדוח" type="month" style="width:auto;" />
